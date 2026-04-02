@@ -551,11 +551,11 @@
           </div>
         </div>
         <div class="s-legend">
-          <div class="s-leg-row" id="sleg-0"><span class="s-dot" style="background:#2d7a45"></span><span class="s-range">0 – 20%:</span><span>🔥 Extrema Oportunidade</span></div>
-          <div class="s-leg-row" id="sleg-1"><span class="s-dot" style="background:#5cb85c"></span><span class="s-range">20 – 40%:</span><span>✅ Boa Oportunidade</span></div>
-          <div class="s-leg-row" id="sleg-2"><span class="s-dot" style="background:#f7c948"></span><span class="s-range">40 – 60%:</span><span>⚖️ Condição Neutra</span></div>
-          <div class="s-leg-row" id="sleg-3"><span class="s-dot" style="background:#e05c2a"></span><span class="s-range">60 – 80%:</span><span>⚠️ Momento de Cautela</span></div>
-          <div class="s-leg-row" id="sleg-4"><span class="s-dot" style="background:#8b0000"></span><span class="s-range">80 – 100%:</span><span>💀 Risco Máximo</span></div>
+          <div class="s-leg-row" id="sleg-0"><span class="s-dot" style="background:#2d7a45"></span><span class="s-range">0 – 20%:</span><span>Mercado muito deprimido — aportar</span></div>
+          <div class="s-leg-row" id="sleg-1"><span class="s-dot" style="background:#5cb85c"></span><span class="s-range">20 – 40%:</span><span>Mercado abaixo da média — aportar</span></div>
+          <div class="s-leg-row" id="sleg-2"><span class="s-dot" style="background:#f7c948"></span><span class="s-range">40 – 60%:</span><span>Neutro</span></div>
+          <div class="s-leg-row" id="sleg-3"><span class="s-dot" style="background:#e05c2a"></span><span class="s-range">60 – 80%:</span><span>Mercado aquecido — cautela</span></div>
+          <div class="s-leg-row" id="sleg-4"><span class="s-dot" style="background:#8b0000"></span><span class="s-range">80 – 100%:</span><span>Sobrecomprado — evitar aportes</span></div>
         </div>
         <div class="s-weight-note">
           Composite: <strong>MA200 × 50%</strong> + <strong>MA50 × 35%</strong> + <strong>MA20 × 15%</strong>
@@ -725,38 +725,28 @@
           },
         },
       },
+      plugins: [{
+        id: "thresholds",
+        afterDraw(chart) {
+          const { ctx, scales: { x, y } } = chart;
+          [20, 80].forEach(level => {
+            const yPos = y.getPixelForValue(level);
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(107,107,138,.25)";
+            ctx.setLineDash([4, 6]);
+            ctx.lineWidth = 1;
+            ctx.moveTo(x.left, yPos);
+            ctx.lineTo(x.right, yPos);
+            ctx.stroke();
+            ctx.fillStyle = "rgba(107,107,138,.5)";
+            ctx.font = "10px 'DM Mono'";
+            ctx.fillText(level + "%", x.right + 4, yPos + 3);
+            ctx.restore();
+          });
+        },
+      }],
     });
-
-    // Add threshold lines (20% and 80%)
-    addThresholdPlugin(chart);
-  }
-
-  function addThresholdPlugin(chart) {
-    // Draw 20% and 80% reference lines via afterDraw
-    const plugin = {
-      id: "thresholds",
-      afterDraw(chart) {
-        const { ctx, scales: { x, y } } = chart;
-        [20, 80].forEach(level => {
-          const yPos = y.getPixelForValue(level);
-          ctx.save();
-          ctx.beginPath();
-          ctx.strokeStyle = "rgba(107,107,138,.25)";
-          ctx.setLineDash([4, 6]);
-          ctx.lineWidth = 1;
-          ctx.moveTo(x.left, yPos);
-          ctx.lineTo(x.right, yPos);
-          ctx.stroke();
-          ctx.fillStyle = "rgba(107,107,138,.5)";
-          ctx.font = "10px 'DM Mono'";
-          ctx.fillText(level + "%", x.right + 4, yPos + 3);
-          ctx.restore();
-        });
-      },
-    };
-    chart.config.plugins = chart.config.plugins || [];
-    chart.config.plugins.push(plugin);
-    chart.update();
   }
 
   function setRange(days) {
@@ -823,11 +813,11 @@
 
   function sCondLabel(v) {
     if (v == null)   return ['—', -1];
-    if (v < 0.20)    return ['Extrema Oportunidade', 0];
-    if (v < 0.40)    return ['Boa Oportunidade', 1];
-    if (v < 0.60)    return ['Condição Neutra', 2];
-    if (v < 0.80)    return ['Momento de Cautela', 3];
-    return ['Risco Máximo', 4];
+    if (v < 0.20)    return ['Mercado muito deprimido — aportar', 0];
+    if (v < 0.40)    return ['Mercado abaixo da média — aportar', 1];
+    if (v < 0.60)    return ['Neutro', 2];
+    if (v < 0.80)    return ['Mercado aquecido — cautela', 3];
+    return ['Sobrecomprado — evitar aportes', 4];
   }
 
   function sDetectTrend(data) {
@@ -1016,7 +1006,7 @@
     const pct    = +(score * 100).toFixed(1);
     const [label, legIdx] = sCondLabel(score);
     const trend  = sDetectTrend(enriched);
-    const TREND_SYM = { up: '📈', down: '📉', flat: '➡️' };
+    const TREND_SYM = { up: '↑', down: '↓', flat: '→' };
     const TREND_PT  = { up: 'Subindo', down: 'Caindo', flat: 'Lateral' };
 
     // Pill in header
