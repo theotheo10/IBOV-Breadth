@@ -1,0 +1,70 @@
+name: IBOV Breadth Update
+
+on:
+  schedule:
+    # A cada 15 min, seg–sex, 09:00–18:30 BRT (12:00–21:30 UTC)
+    - cron: "0,15,30,45 12-21 * * 1-5"
+  workflow_dispatch:  # permite trigger manual
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Restaura cache de dados entre execuções
+      - name: Restore data cache
+        uses: actions/cache@v4
+        with:
+          path: data/
+          key: ibov-data-${{ runner.os }}-${{ hashFiles('data/ibov_composition.py') }}
+          restore-keys: |
+            ibov-data-${{ runner.os }}-
+
+      - name: Run update
+        run: python jobs/daily_update.py
+
+      # Salva dados atualizados no cache
+      - name: Save data cache
+        uses: actions/cache/save@v4
+        with:
+          path: data/
+          key: ibov-data-${{ runner.os }}-${{ github.run_id }}
+
+      # Commit de dados (.parquet) e código (.py) se a manutenção detectou mudanças
+      - name: Commit changes
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Sempre commita os parquets atualizados
+          git add data/*.parquet || true
+
+          # Se a manutenção auto-detectou mudanças, commita os .py também
+          if [ -f data/.maintenance_changes ]; then
+            echo "Manutenção automática detectou mudanças — commitando arquivos .py"
+            git add data/ticker_normalization.py || true
+            git add data/ibov_composition.py || true
+            git add data/auto_maintenance.py || true
+            rm data/.maintenance_changes
+            git add -A || true
+            git diff --staged --quiet || git commit -m "auto: ticker/composição atualizado [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          else
+            git diff --staged --quiet || git commit -m "data: update breadth [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+          fi
+
+          git push || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
