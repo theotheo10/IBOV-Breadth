@@ -1,0 +1,160 @@
+name: Lembrete de Rebalanceamento IBOV
+
+on:
+  schedule:
+    # Roda todo dia útil às 8h BRT (11h UTC) nos meses de abril, agosto e dezembro
+    # O script verifica se é o último dia útil do mês antes de enviar
+    - cron: "0 11 * 4,8,12 1-5"
+  workflow_dispatch:
+    inputs:
+      force_send:
+        description: 'Forçar envio do email (para teste)'
+        required: false
+        default: 'false'
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verificar se é o último dia útil do mês
+        id: check
+        run: |
+          python3 << 'EOF'
+          import datetime, os
+
+          today = datetime.date.today()
+          force = "${{ github.event.inputs.force_send }}" == "true"
+
+          # Encontrar o último dia útil do mês atual
+          # Vai ao último dia do mês e retrocede até encontrar seg-sex
+          if today.month == 12:
+              last_day = datetime.date(today.year + 1, 1, 1) - datetime.timedelta(days=1)
+          else:
+              last_day = datetime.date(today.year, today.month + 1, 1) - datetime.timedelta(days=1)
+
+          # Retroceder até dia útil (0=seg, 6=dom)
+          while last_day.weekday() >= 5:
+              last_day -= datetime.timedelta(days=1)
+
+          # Enviar no penúltimo dia útil (B3 divulga a 3ª prévia nesse dia)
+          # i.e., um dia útil antes do último
+          penultimo = last_day - datetime.timedelta(days=1)
+          while penultimo.weekday() >= 5:
+              penultimo -= datetime.timedelta(days=1)
+
+          should_send = force or (today == penultimo)
+
+          period_map = {4: "maio–agosto", 8: "setembro–dezembro", 12: "janeiro–abril"}
+          next_month = today.month
+          period = period_map.get(next_month, "próximo quadrimestre")
+
+          vigor_map = {4: "1º de maio", 8: "1º de setembro", 12: "5 de janeiro"}
+          vigor = vigor_map.get(next_month, "início do próximo mês")
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"should_send={'true' if should_send else 'false'}\n")
+              f.write(f"period={period}\n")
+              f.write(f"vigor={vigor}\n")
+              f.write(f"today={today.strftime('%d/%m/%Y')}\n")
+              f.write(f"penultimo={penultimo.strftime('%d/%m/%Y')}\n")
+
+          print(f"Hoje: {today} | Penúltimo útil: {penultimo} | Enviar: {should_send}")
+          EOF
+
+      - name: Enviar email de lembrete
+        if: steps.check.outputs.should_send == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: theo.fernandes10@gmail.com
+          from: "IBOV Breadth <${{ secrets.MAIL_USERNAME }}>"
+          subject: "Rebalanceamento do IBOV — atualizar ibov_composition.py"
+          html_body: |
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <body style="font-family: 'DM Mono', monospace; background:#0a0a0f; color:#e2e2f0; padding:2rem; margin:0;">
+              <div style="max-width:560px; margin:0 auto;">
+
+                <div style="font-size:1.4rem; font-weight:700; margin-bottom:.25rem;">
+                  IBOV <span style="color:#7c6af7">breadth</span>
+                </div>
+                <div style="font-size:.75rem; color:#6b6b8a; margin-bottom:2rem;">
+                  lembrete automático de manutenção
+                </div>
+
+                <div style="background:#111118; border:1px solid #1e1e2e; border-radius:8px; padding:1.5rem; margin-bottom:1.5rem;">
+                  <div style="font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:#6b6b8a; margin-bottom:.75rem;">
+                    Ação necessária
+                  </div>
+                  <div style="font-size:1rem; font-weight:600; margin-bottom:.5rem;">
+                    A B3 divulgou hoje a 3ª prévia do IBOV
+                  </div>
+                  <div style="font-size:.85rem; color:#6b6b8a; line-height:1.7;">
+                    Nova carteira válida para <strong style="color:#e2e2f0;">${{ steps.check.outputs.period }}</strong>,
+                    em vigor a partir de <strong style="color:#e2e2f0;">${{ steps.check.outputs.vigor }}</strong>.
+                  </div>
+                </div>
+
+                <div style="background:#111118; border:1px solid #1e1e2e; border-radius:8px; padding:1.5rem; margin-bottom:1.5rem;">
+                  <div style="font-size:.65rem; letter-spacing:.1em; text-transform:uppercase; color:#6b6b8a; margin-bottom:1rem;">
+                    O que fazer
+                  </div>
+                  <div style="font-size:.82rem; line-height:2; color:#e2e2f0;">
+                    <div style="margin-bottom:.5rem;">
+                      <span style="color:#7c6af7; margin-right:.5rem;">1.</span>
+                      Acessar a composição oficial no site da B3
+                    </div>
+                    <div style="margin-bottom:.5rem;">
+                      <span style="color:#7c6af7; margin-right:.5rem;">2.</span>
+                      Abrir <code style="background:#1e1e2e; padding:.1rem .4rem; border-radius:3px; font-size:.78rem;">data/ibov_composition.py</code> no GitHub
+                    </div>
+                    <div style="margin-bottom:.5rem;">
+                      <span style="color:#7c6af7; margin-right:.5rem;">3.</span>
+                      Adicionar o novo período em <code style="background:#1e1e2e; padding:.1rem .4rem; border-radius:3px; font-size:.78rem;">IBOV_COMPOSITION_HISTORY</code>
+                    </div>
+                    <div>
+                      <span style="color:#7c6af7; margin-right:.5rem;">4.</span>
+                      Commitar — o GitHub Actions cuida do resto
+                    </div>
+                  </div>
+                </div>
+
+                <div style="margin-bottom:1.5rem;">
+                  <a href="https://www.b3.com.br/pt_br/market-data-e-indices/indices/indices-amplos/indice-ibovespa-ibovespa-composicao-da-carteira.htm"
+                     style="display:inline-block; background:#7c6af7; color:#fff; text-decoration:none;
+                            padding:.6rem 1.25rem; border-radius:6px; font-size:.8rem; font-weight:600; margin-right:.75rem;">
+                    Composição no site da B3
+                  </a>
+                  <a href="https://github.com/theotheo10/IBOV-Breadth/blob/main/data/ibov_composition.py"
+                     style="display:inline-block; background:#1e1e2e; color:#e2e2f0; text-decoration:none;
+                            padding:.6rem 1.25rem; border-radius:6px; font-size:.8rem; border:1px solid #2a2a3d;">
+                    Abrir ibov_composition.py
+                  </a>
+                </div>
+
+                <div style="font-size:.65rem; color:#6b6b8a; border-top:1px solid #1e1e2e; padding-top:1rem; line-height:1.8;">
+                  Enviado automaticamente pelo GitHub Actions · ${{ steps.check.outputs.today }}<br/>
+                  Repositório: theotheo10/IBOV-Breadth
+                </div>
+
+              </div>
+            </body>
+            </html>
+
+      - name: Log resultado
+        run: |
+          if [ "${{ steps.check.outputs.should_send }}" = "true" ]; then
+            echo "✓ Email enviado para theo.fernandes10@gmail.com"
+            echo "  Período: ${{ steps.check.outputs.period }}"
+            echo "  Vigor: ${{ steps.check.outputs.vigor }}"
+          else
+            echo "ℹ Não é dia de envio."
+            echo "  Hoje: ${{ steps.check.outputs.today }}"
+            echo "  Penúltimo dia útil do mês: ${{ steps.check.outputs.penultimo }}"
+          fi
