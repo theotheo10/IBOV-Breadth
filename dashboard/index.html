@@ -283,6 +283,174 @@
     .kpis { grid-template-columns: 1fr; }
     header { flex-direction: column; gap: 1rem; }
   }
+
+  /* ══ Sentimento do IBOV block ══ */
+  .sentimento-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+
+  .sentimento-header {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .85rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s;
+  }
+  .sentimento-header:hover { background: rgba(124,106,247,.04); }
+
+  .s-chevron {
+    font-size: .75rem;
+    color: var(--muted);
+    transition: transform .2s;
+  }
+  .s-chevron.closed { transform: rotate(-90deg); }
+
+  .s-title {
+    font-family: 'Syne', sans-serif;
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .s-composite-pill {
+    margin-left: auto;
+    font-family: 'Syne', sans-serif;
+    font-size: .75rem;
+    font-weight: 700;
+    padding: .15rem .55rem;
+    border-radius: 4px;
+    background: rgba(124,106,247,.12);
+    color: var(--accent);
+    transition: background .3s, color .3s;
+  }
+
+  .sentimento-body {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+
+  .s-chart-label {
+    font-family: 'Syne', sans-serif;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: .75rem;
+    text-align: center;
+  }
+
+  .s-canvas-wrap {
+    position: relative;
+    height: 260px;
+  }
+
+  .s-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.1rem;
+  }
+
+  .s-condition-title {
+    font-family: 'Syne', sans-serif;
+    font-size: .95rem;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: -.01em;
+    color: var(--text);
+  }
+
+  .s-gauge-wrap {
+    position: relative;
+    width: 260px;
+  }
+
+  .s-gauge-wrap canvas { width: 100% !important; }
+
+  .s-gauge-center {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .s-gauge-label {
+    font-size: .65rem;
+    color: var(--muted);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    margin-bottom: .15rem;
+  }
+
+  .s-gauge-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1;
+    transition: color .4s;
+  }
+
+  .s-legend {
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    width: 100%;
+    font-size: .7rem;
+  }
+
+  .s-leg-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .25rem .5rem;
+    border-radius: 4px;
+    transition: background .15s;
+    color: var(--text);
+  }
+  .s-leg-row.active {
+    background: rgba(255,255,255,.05);
+    outline: 1px solid rgba(255,255,255,.08);
+  }
+
+  .s-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .s-range {
+    color: var(--muted);
+    min-width: 58px;
+  }
+
+  .s-weight-note {
+    font-size: .62rem;
+    color: var(--muted);
+    text-align: center;
+    border-top: 1px solid var(--border);
+    padding-top: .65rem;
+    line-height: 1.7;
+  }
+  .s-weight-note strong { color: var(--text); }
+
+  @media (max-width: 820px) {
+    .sentimento-body { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -361,6 +529,42 @@
     <div class="chart-canvas-wrap"><canvas id="chart"></canvas></div>
   </div>
 
+  <!-- ══ BLOCO: SENTIMENTO DO IBOV ══ -->
+  <div class="sentimento-card" id="sentimentoCard">
+    <div class="sentimento-header" id="sentimentoHeader" onclick="toggleSentimento()">
+      <span class="s-chevron" id="sChevron">▼</span>
+      <span class="s-title">Sentimento do IBOV</span>
+      <span class="s-composite-pill" id="sPill">—</span>
+    </div>
+    <div class="sentimento-body" id="sentimentoBody">
+      <div>
+        <div class="s-chart-label">IBOV com coloração de sentimento</div>
+        <div class="s-canvas-wrap"><canvas id="sIbovChart"></canvas></div>
+      </div>
+      <div class="s-right">
+        <div class="s-condition-title" id="sCondTitle">—</div>
+        <div class="s-gauge-wrap">
+          <canvas id="sGauge" width="260" height="158"></canvas>
+          <div class="s-gauge-center">
+            <div class="s-gauge-label" id="sGaugeLabel">—</div>
+            <div class="s-gauge-value" id="sGaugeValue">—</div>
+          </div>
+        </div>
+        <div class="s-legend">
+          <div class="s-leg-row" id="sleg-0"><span class="s-dot" style="background:#2d7a45"></span><span class="s-range">0 – 20%:</span><span>🔥 Extrema Oportunidade</span></div>
+          <div class="s-leg-row" id="sleg-1"><span class="s-dot" style="background:#5cb85c"></span><span class="s-range">20 – 40%:</span><span>✅ Boa Oportunidade</span></div>
+          <div class="s-leg-row" id="sleg-2"><span class="s-dot" style="background:#f7c948"></span><span class="s-range">40 – 60%:</span><span>⚖️ Condição Neutra</span></div>
+          <div class="s-leg-row" id="sleg-3"><span class="s-dot" style="background:#e05c2a"></span><span class="s-range">60 – 80%:</span><span>⚠️ Momento de Cautela</span></div>
+          <div class="s-leg-row" id="sleg-4"><span class="s-dot" style="background:#8b0000"></span><span class="s-range">80 – 100%:</span><span>💀 Risco Máximo</span></div>
+        </div>
+        <div class="s-weight-note">
+          Composite: <strong>MA200 × 50%</strong> + <strong>MA50 × 35%</strong> + <strong>MA20 × 15%</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <footer>
     <span>IBOV Breadth API — survivorship-bias-free — dados EOD via Yahoo Finance</span>
     <span>atualiza a cada 15min no pregão</span>
@@ -402,6 +606,7 @@
 
       renderKPIs(latest);
       renderChart(allData);
+      initSentimento(allData);
 
       document.getElementById("loading").classList.add("hidden");
 
@@ -561,6 +766,7 @@
 
     if (!days) {
       renderChart(allData);
+      initSentimento(allData);
       return;
     }
 
@@ -573,6 +779,280 @@
   // ── Auto-refresh every 5 min ─────────────────────────────────────────────
   init();
   setInterval(init, 5 * 60 * 1000);
+
+  // ════════════════════════════════════════════════════════════════════
+  //  SENTIMENTO DO IBOV — composite breadth coloring module
+  //  Weights: MA200×50% + MA50×35% + MA20×15%
+  //  Rationale: longer MAs have stronger predictive power over forward
+  //  returns (CFA Institute 2022; Zaremba et al. 2021; StockCharts).
+  // ════════════════════════════════════════════════════════════════════
+
+  // ── Composite scorer ────────────────────────────────────────────────
+  function sComposite(b20, b50, b200) {
+    let score = 0, w = 0;
+    if (b200 != null) { score += b200 * 0.50; w += 0.50; }
+    if (b50  != null) { score += b50  * 0.35; w += 0.35; }
+    if (b20  != null) { score += b20  * 0.15; w += 0.15; }
+    return w === 0 ? null : score / w;
+  }
+
+  // ── Color scale: deep green → lime → yellow → orange → dark red ─────
+  function sScoreToColor(v, alpha) {
+    alpha = alpha == null ? 1 : alpha;
+    const stops = [
+      [0,    [26,  77,  46]],
+      [0.15, [45,  122, 69]],
+      [0.30, [92,  184, 92]],
+      [0.42, [138, 201, 38]],
+      [0.50, [247, 201, 72]],
+      [0.62, [240, 151, 74]],
+      [0.72, [224, 92,  42]],
+      [0.83, [192, 57,  43]],
+      [1.0,  [100, 20,  20]],
+    ];
+    let lo = stops[0], hi = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (v >= stops[i][0] && v <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
+    }
+    const t = lo[0] === hi[0] ? 0 : (v - lo[0]) / (hi[0] - lo[0]);
+    const r = Math.round(lo[1][0] + t * (hi[1][0] - lo[1][0]));
+    const g = Math.round(lo[1][1] + t * (hi[1][1] - lo[1][1]));
+    const b = Math.round(lo[1][2] + t * (hi[1][2] - lo[1][2]));
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function sCondLabel(v) {
+    if (v == null)   return ['—', -1];
+    if (v < 0.20)    return ['Extrema Oportunidade', 0];
+    if (v < 0.40)    return ['Boa Oportunidade', 1];
+    if (v < 0.60)    return ['Condição Neutra', 2];
+    if (v < 0.80)    return ['Momento de Cautela', 3];
+    return ['Risco Máximo', 4];
+  }
+
+  function sDetectTrend(data) {
+    if (data.length < 20) return 'flat';
+    const now  = data[data.length - 1].composite;
+    const prev = data[data.length - 20].composite;
+    if (now == null || prev == null) return 'flat';
+    const diff = now - prev;
+    return diff >  0.03 ? 'up' : diff < -0.03 ? 'down' : 'flat';
+  }
+
+  // ── Gauge (raw canvas 2D) ────────────────────────────────────────────
+  let sGaugeCtx = null;
+
+  function sDrawGauge(pct) {
+    const canvas = document.getElementById('sGauge');
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = 260, H = 158;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    sGaugeCtx = ctx;
+
+    const cx = W / 2, cy = H - 16;
+    const R = W * 0.42, r = W * 0.28;
+    const steps = 200;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Colored arc
+    for (let i = 0; i < steps; i++) {
+      const t0 = Math.PI + (i / steps) * Math.PI;
+      const t1 = Math.PI + ((i + 1) / steps) * Math.PI;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, t0, t1);
+      ctx.arc(cx, cy, r, t1, t0, true);
+      ctx.closePath();
+      ctx.fillStyle = sScoreToColor(i / steps, 1);
+      ctx.fill();
+    }
+
+    // Dark groove band
+    const bR = (R + r) / 2, bW = (R - r) * 0.38;
+    ctx.beginPath();
+    ctx.arc(cx, cy, bR + bW / 2, Math.PI, 2 * Math.PI);
+    ctx.arc(cx, cy, bR - bW / 2, 2 * Math.PI, Math.PI, true);
+    ctx.closePath();
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fill();
+
+    // Tick labels
+    [0, 20, 40, 50, 60, 80, 100].forEach(t => {
+      const angle = Math.PI + (t / 100) * Math.PI;
+      ctx.font = `${W * 0.036}px 'DM Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(180,180,200,.65)';
+      ctx.fillText(t, cx + (R + 13) * Math.cos(angle), cy + (R + 13) * Math.sin(angle));
+    });
+
+    // Needle
+    if (pct != null) {
+      const ang = Math.PI + (pct / 100) * Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + (r - 4) * Math.cos(ang), cy + (r - 4) * Math.sin(ang));
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+  }
+
+  // ── IBOV colored line chart ──────────────────────────────────────────
+  let sSentimentChart = null;
+
+  function sRenderChart(enriched) {
+    const ctx = document.getElementById('sIbovChart').getContext('2d');
+    if (sSentimentChart) sSentimentChart.destroy();
+
+    sSentimentChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: enriched.map(d => d.date),
+        datasets: [{
+          label: 'Sentimento',
+          data: enriched.map(d => d.composite != null ? +(d.composite * 100).toFixed(2) : null),
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: false,
+          spanGaps: false,
+          segment: {
+            borderColor: ctx => {
+              const v = ctx.p0.parsed.y;
+              return v == null ? 'transparent' : sScoreToColor(v / 100, 0.95);
+            },
+          },
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#111118',
+            borderColor: '#1e1e2e',
+            borderWidth: 1,
+            titleColor: '#6b6b8a',
+            bodyColor: '#e2e2f0',
+            callbacks: {
+              label: ctx => {
+                const v = ctx.parsed.y;
+                if (v == null) return '—';
+                const [label] = sCondLabel(v / 100);
+                return `Sentimento: ${v.toFixed(1)}%  ·  ${label}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(30,30,46,.5)' },
+            ticks: { color: '#6b6b8a', font: { family: "'DM Mono'", size: 10 }, maxTicksLimit: 10, maxRotation: 0 },
+          },
+          y: {
+            min: 0, max: 100,
+            grid: { color: 'rgba(30,30,46,.5)' },
+            ticks: { color: '#6b6b8a', font: { family: "'DM Mono'", size: 10 }, callback: v => v + '%' },
+          },
+        },
+      },
+      plugins: [{
+        id: 'sBgZones',
+        beforeDraw(chart) {
+          const { ctx, scales: { y, x } } = chart;
+          [
+            [0,  20,  'rgba(45,122,69,.07)'],
+            [20, 40,  'rgba(92,184,92,.04)'],
+            [40, 60,  'rgba(247,201,72,.04)'],
+            [60, 80,  'rgba(224,92,42,.04)'],
+            [80, 100, 'rgba(139,0,0,.07)'],
+          ].forEach(([lo, hi, color]) => {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.fillRect(x.left, y.getPixelForValue(hi), x.right - x.left, y.getPixelForValue(lo) - y.getPixelForValue(hi));
+            ctx.restore();
+          });
+          // 50% reference line
+          ctx.save();
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(247,201,72,.18)';
+          ctx.setLineDash([4, 6]);
+          ctx.lineWidth = 1;
+          ctx.moveTo(x.left, y.getPixelForValue(50));
+          ctx.lineTo(x.right, y.getPixelForValue(50));
+          ctx.stroke();
+          ctx.restore();
+        },
+      }],
+    });
+  }
+
+  // ── Init sentimento block ────────────────────────────────────────────
+  function initSentimento(data) {
+    // data = allData from the main init (already fetched)
+    const enriched = data
+      .map(d => ({ ...d, composite: sComposite(d.breadth_20, d.breadth_50, d.breadth_200) }))
+      .filter(d => d.composite != null);
+
+    if (!enriched.length) return;
+
+    const latest = enriched[enriched.length - 1];
+    const score  = latest.composite;
+    const pct    = +(score * 100).toFixed(1);
+    const [label, legIdx] = sCondLabel(score);
+    const trend  = sDetectTrend(enriched);
+    const TREND_SYM = { up: '📈', down: '📉', flat: '➡️' };
+    const TREND_PT  = { up: 'Subindo', down: 'Caindo', flat: 'Lateral' };
+
+    // Pill in header
+    const pill = document.getElementById('sPill');
+    pill.textContent = pct + '%';
+    pill.style.background = sScoreToColor(score, 0.18);
+    pill.style.color = sScoreToColor(score, 1);
+
+    // Condition title
+    document.getElementById('sCondTitle').textContent =
+      `Condição Atual (${TREND_SYM[trend]} ${TREND_PT[trend]})`;
+
+    // Gauge
+    sDrawGauge(pct);
+    document.getElementById('sGaugeLabel').textContent = label;
+    const gv = document.getElementById('sGaugeValue');
+    gv.textContent = pct + '%';
+    gv.style.color = sScoreToColor(score, 1);
+
+    // Legend highlight
+    for (let i = 0; i <= 4; i++) {
+      document.getElementById('sleg-' + i).classList.toggle('active', i === legIdx);
+    }
+
+    // Colored chart
+    sRenderChart(enriched);
+  }
+
+  function toggleSentimento() {
+    const body    = document.getElementById('sentimentoBody');
+    const chevron = document.getElementById('sChevron');
+    const isOpen  = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    chevron.classList.toggle('closed', isOpen);
+  }
+
 </script>
 </body>
 </html>
