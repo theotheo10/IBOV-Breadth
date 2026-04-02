@@ -6,401 +6,372 @@
 <title>IBOV Breadth</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:      #0a0a0f;
-  --surface: #111118;
-  --surface2:#16161f;
-  --border:  #1e1e2e;
-  --border2: #2a2a3d;
-  --text:    #e2e2f0;
-  --muted:   #6b6b8a;
-  --accent:  #7c6af7;
-  --c20:     #3dffa0;
-  --c50:     #f7c948;
-  --c200:    #7c6af7;
+  --bg:     #09090e;
+  --sur:    #0f0f17;
+  --bdr:    #1c1c2a;
+  --bdr2:   #26263a;
+  --text:   #ddddf0;
+  --muted:  #64647e;
+  --accent: #7c6af7;
+  --c20:    #3dffa0;
+  --c50:    #f7c948;
+  --c200:   #7c6af7;
 }
 
-* { margin:0; padding:0; box-sizing:border-box; }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'DM Mono', monospace;
   min-height: 100vh;
-  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* subtle dot grid */
 body::before {
-  content:'';
-  position:fixed; inset:0;
-  background-image:
-    linear-gradient(rgba(124,106,247,.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(124,106,247,.025) 1px, transparent 1px);
-  background-size: 40px 40px;
-  pointer-events:none; z-index:0;
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image: radial-gradient(circle, rgba(124,106,247,.08) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
-.wrapper {
-  position:relative; z-index:1;
-  max-width:1400px; margin:0 auto; padding:2rem;
-}
+.page { position:relative; z-index:1; max-width:1280px; margin:0 auto; padding:2.5rem 2rem; }
 
 /* ── Loading ── */
 #loading {
   position:fixed; inset:0; background:var(--bg);
   display:flex; flex-direction:column; align-items:center;
-  justify-content:center; z-index:100; gap:1rem;
-  font-family:'DM Mono', monospace; color:var(--muted);
+  justify-content:center; z-index:200; gap:1rem;
+  color:var(--muted); font-size:.75rem;
 }
 .spinner {
-  width:32px; height:32px;
-  border:2px solid var(--border);
+  width:28px; height:28px;
+  border:1.5px solid var(--bdr);
   border-top-color:var(--accent);
   border-radius:50%;
-  animation:spin .8s linear infinite;
+  animation:spin .7s linear infinite;
 }
 @keyframes spin { to { transform:rotate(360deg); } }
 #loading.hidden { display:none; }
 
 /* ── Error ── */
-.error-msg {
-  background:rgba(255,92,106,.08);
-  border:1px solid rgba(255,92,106,.3);
-  color:#ff5c6a; padding:1rem 1.5rem;
-  border-radius:8px; font-size:.8rem; display:none;
-  margin-bottom:1.5rem;
+.error {
+  display:none; margin-bottom:2rem;
+  padding:.85rem 1.25rem;
+  border:1px solid rgba(255,92,106,.25);
+  border-radius:6px; color:#ff6b7a;
+  font-size:.75rem; line-height:1.6;
 }
-.error-msg.visible { display:block; }
+.error.on { display:block; }
 
-/* ══════════════════════════════════════════
+/* ══════════════════════════════════════
    HEADER
-══════════════════════════════════════════ */
+══════════════════════════════════════ */
 header {
-  display:flex; align-items:center;
+  display:flex; align-items:flex-end;
   justify-content:space-between;
-  margin-bottom:2rem;
-  padding-bottom:1.25rem;
-  border-bottom:1px solid var(--border);
+  padding-bottom:1.75rem;
+  border-bottom:1px solid var(--bdr);
+  margin-bottom:2.5rem;
 }
+
 .logo {
   font-family:'Syne', sans-serif;
-  font-weight:800; font-size:1.5rem;
-  letter-spacing:-.02em;
+  font-size:1.35rem; font-weight:800;
+  letter-spacing:-.025em; line-height:1;
 }
-.logo span { color:var(--accent); }
-.logo-sub {
+.logo em { color:var(--accent); font-style:normal; }
+
+.meta {
   font-size:.68rem; color:var(--muted);
-  margin-top:.25rem; letter-spacing:.01em;
+  text-align:right; line-height:2;
 }
-.header-meta {
-  text-align:right; font-size:.68rem;
-  color:var(--muted); line-height:2;
-}
-.header-meta .live { color:#3dffa0; }
+.meta .live { color:var(--c20); }
 
-/* ══════════════════════════════════════════
-   HERO — composite + gauge + condição
-══════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   HERO CARD — score + barra + MAs
+══════════════════════════════════════ */
 .hero {
-  display:grid;
-  grid-template-columns:1fr 300px;
-  gap:1.5rem;
-  margin-bottom:1.5rem;
-}
-
-/* Left: score principal */
-.hero-left {
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:12px;
+  background:var(--sur);
+  border:1px solid var(--bdr);
+  border-radius:10px;
   padding:2rem 2.5rem;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
+  margin-bottom:1rem;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:3rem;
+  align-items:center;
   position:relative;
   overflow:hidden;
 }
-.hero-left::before {
-  content:'';
-  position:absolute;
-  top:0; left:0; right:0; height:3px;
+
+/* linha de cor no topo do hero */
+.hero::before {
+  content:''; position:absolute;
+  top:0; left:0; right:0; height:2px;
   background:var(--hero-color, var(--accent));
-  transition:background .5s;
+  transition:background .6s;
 }
+
+.hero-main {}
+
 .hero-eyebrow {
-  font-size:.65rem; letter-spacing:.12em;
+  font-size:.6rem; letter-spacing:.14em;
   text-transform:uppercase; color:var(--muted);
-  margin-bottom:.75rem;
+  margin-bottom:.9rem;
 }
+
 .hero-score {
   font-family:'Syne', sans-serif;
-  font-size:5rem; font-weight:800;
+  font-size:4rem; font-weight:800;
   line-height:1; letter-spacing:-.04em;
   color:var(--hero-color, var(--text));
-  transition:color .5s;
+  transition:color .6s;
   margin-bottom:.5rem;
 }
+
 .hero-label {
-  font-family:'Syne', sans-serif;
-  font-size:1.1rem; font-weight:600;
-  color:var(--text); margin-bottom:1.5rem;
+  font-size:.88rem; color:var(--text);
+  margin-bottom:1.5rem;
+  font-weight:400;
 }
-.hero-trend {
-  display:inline-flex; align-items:center;
-  gap:.4rem; font-size:.72rem;
-  color:var(--muted); cursor:help;
+
+/* barra colorizada */
+.score-bar-wrap {
+  position:relative; margin-bottom:.5rem;
+}
+.score-bar-track {
+  height:6px; border-radius:3px;
+  background:linear-gradient(to right,
+    #1a4d2e 0%, #2d7a45 15%, #5cb85c 30%,
+    #8ac926 42%, #f7c948 50%,
+    #f0974a 62%, #e05c2a 72%,
+    #c0392b 83%, #6b0000 100%);
   position:relative;
 }
-.hero-trend .trend-arrow {
-  font-size:.85rem;
-  font-family:'Syne', sans-serif;
-  font-weight:700;
+.score-bar-needle {
+  position:absolute; top:50%;
+  transform:translate(-50%,-50%);
+  width:12px; height:12px;
+  border-radius:50%;
+  background:#fff;
+  border:2px solid var(--bg);
+  box-shadow:0 0 0 1px rgba(255,255,255,.3);
+  transition:left .6s cubic-bezier(.4,0,.2,1);
 }
-.hero-trend .trend-up   { color:#3dffa0; }
-.hero-trend .trend-down { color:#ff5c6a; }
-.hero-trend .trend-flat { color:var(--muted); }
+.score-bar-labels {
+  display:flex; justify-content:space-between;
+  margin-top:.4rem;
+  font-size:.58rem; color:var(--muted);
+}
 
-/* Tooltip do trend */
-.trend-tooltip {
-  display:none;
-  position:absolute;
+/* trend */
+.hero-trend {
+  display:inline-flex; align-items:center;
+  gap:.35rem; font-size:.68rem; color:var(--muted);
+  margin-top:.9rem; cursor:help; position:relative;
+}
+.trend-sym { font-weight:700; }
+.trend-up   .trend-sym { color:var(--c20); }
+.trend-down .trend-sym { color:#ff6b7a; }
+.trend-flat .trend-sym { color:var(--muted); }
+
+.trend-tip {
+  display:none; position:absolute;
   bottom:calc(100% + 8px); left:0;
-  background:#1e1e2e; border:1px solid var(--border2);
-  border-radius:6px; padding:.6rem .9rem;
-  font-size:.68rem; color:var(--text);
-  white-space:nowrap; line-height:1.7; z-index:10;
-  pointer-events:none;
+  background:var(--bdr2); border:1px solid var(--bdr2);
+  border-radius:6px; padding:.65rem .9rem;
+  font-size:.65rem; color:var(--text);
+  white-space:nowrap; line-height:1.8;
+  z-index:10; pointer-events:none;
+  min-width:220px;
 }
-.hero-trend:hover .trend-tooltip { display:block; }
+.hero-trend:hover .trend-tip { display:block; }
 
-/* MA pills na hero-left */
-.hero-ma-row {
-  display:flex; gap:.75rem; margin-top:1.5rem;
-  flex-wrap:wrap;
-}
-.ma-pill {
-  display:flex; align-items:center; gap:.4rem;
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:6px; padding:.35rem .7rem;
-  font-size:.7rem;
-}
-.ma-pill-dot {
-  width:6px; height:6px; border-radius:50%;
-}
-.ma-pill-label { color:var(--muted); }
-.ma-pill-val { font-family:'Syne', sans-serif; font-weight:700; }
-
-/* Right: gauge */
-.hero-right {
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:12px;
-  padding:1.5rem;
+/* MAs — lado direito do hero */
+.hero-mas {
   display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  gap:.75rem;
+  gap:.85rem; min-width:180px;
 }
-.gauge-title {
-  font-size:.62rem; letter-spacing:.1em;
-  text-transform:uppercase; color:var(--muted);
-  align-self:flex-start;
+.ma-row {
+  display:flex; align-items:baseline;
+  justify-content:space-between; gap:1.5rem;
 }
-.gauge-canvas-wrap {
-  position:relative; width:100%;
+.ma-name {
+  font-size:.62rem; color:var(--muted);
+  display:flex; align-items:center; gap:.4rem;
 }
-.gauge-canvas-wrap canvas { width:100% !important; }
-/* Score abaixo do gauge */
-.gauge-below {
-  text-align:center; width:100%;
-}
-.gauge-score {
+.ma-dot { width:5px; height:5px; border-radius:50%; }
+.ma-val {
   font-family:'Syne', sans-serif;
-  font-size:2.2rem; font-weight:800;
-  line-height:1; color:var(--hero-color, var(--text));
-  transition:color .5s;
+  font-size:1.05rem; font-weight:700;
 }
-.gauge-sublabel {
-  font-size:.65rem; color:var(--muted);
-  margin-top:.25rem; letter-spacing:.04em;
+.ma-bar {
+  width:100%; height:2px; border-radius:1px;
+  background:var(--bdr); margin-top:.2rem;
+  overflow:hidden;
 }
+.ma-bar-fill { height:100%; border-radius:1px; transition:width .6s; }
 
-/* ══════════════════════════════════════════
-   LEGEND BAR (horizontal, abaixo do hero)
-══════════════════════════════════════════ */
-.legend-bar {
-  display:flex; gap:.5rem;
-  margin-bottom:1.5rem;
+/* ══════════════════════════════════════
+   LEGEND — horizontal, slim
+══════════════════════════════════════ */
+.legend {
+  display:flex; gap:.4rem;
+  margin-bottom:1.75rem;
   flex-wrap:wrap;
 }
-.leg-item {
-  display:flex; align-items:center; gap:.4rem;
-  padding:.3rem .65rem;
-  border:1px solid var(--border);
-  border-radius:6px; font-size:.68rem;
-  color:var(--muted);
-  transition:background .15s, border-color .15s, color .15s;
-  white-space:nowrap;
+.leg {
+  display:flex; align-items:center; gap:.35rem;
+  padding:.22rem .6rem;
+  border:1px solid var(--bdr);
+  border-radius:4px; font-size:.62rem;
+  color:var(--muted); white-space:nowrap;
+  transition:border-color .2s, color .2s, background .2s;
 }
-.leg-item.active {
-  border-color:var(--leg-color);
+.leg.on {
+  border-color:var(--lc);
   color:var(--text);
-  background:rgba(255,255,255,.04);
+  background:rgba(255,255,255,.03);
 }
-.leg-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.leg-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
 
-/* ══════════════════════════════════════════
-   GRÁFICO PRINCIPAL — sentimento colorizado
-══════════════════════════════════════════ */
-.chart-card {
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:12px;
+/* ══════════════════════════════════════
+   GRÁFICO PRINCIPAL
+══════════════════════════════════════ */
+.chart-wrap {
+  background:var(--sur);
+  border:1px solid var(--bdr);
+  border-radius:10px;
   padding:1.5rem;
-  margin-bottom:1.5rem;
+  margin-bottom:1rem;
 }
-.chart-top {
+.chart-head {
   display:flex; align-items:center;
   justify-content:space-between;
   margin-bottom:1.25rem; flex-wrap:wrap; gap:.75rem;
 }
-.chart-title {
-  font-family:'Syne', sans-serif;
-  font-size:.72rem; font-weight:600;
-  letter-spacing:.08em; text-transform:uppercase;
-  color:var(--muted);
+.chart-label {
+  font-size:.6rem; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted);
 }
-.range-btns {
-  display:flex; gap:.4rem;
+.range-row { display:flex; gap:.3rem; }
+.rbtn {
+  background:none; border:1px solid var(--bdr);
+  color:var(--muted); font-family:'DM Mono',monospace;
+  font-size:.62rem; padding:.2rem .55rem;
+  border-radius:4px; cursor:pointer; transition:all .15s;
 }
-.range-btn {
-  background:none;
-  border:1px solid var(--border);
-  color:var(--muted);
-  font-family:'DM Mono', monospace;
-  font-size:.68rem;
-  padding:.25rem .6rem;
-  border-radius:4px; cursor:pointer;
-  transition:all .15s;
+.rbtn:hover, .rbtn.on {
+  border-color:var(--accent); color:var(--accent);
+  background:rgba(124,106,247,.07);
 }
-.range-btn:hover, .range-btn.active {
-  border-color:var(--accent);
-  color:var(--accent);
-  background:rgba(124,106,247,.08);
-}
-.chart-canvas-wrap { position:relative; height:320px; }
+.chart-canvas { position:relative; height:300px; }
 canvas { width:100% !important; }
 
-/* ══════════════════════════════════════════
+/* ══════════════════════════════════════
    SEÇÃO TÉCNICA — colapsável
-══════════════════════════════════════════ */
-.tech-section {
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:12px;
-  margin-bottom:1.5rem;
+══════════════════════════════════════ */
+.tech {
+  background:var(--sur);
+  border:1px solid var(--bdr);
+  border-radius:10px;
   overflow:hidden;
+  margin-bottom:1rem;
 }
-.tech-header {
-  display:flex; align-items:center; gap:.6rem;
-  padding:.85rem 1.25rem;
-  border-bottom:1px solid var(--border);
-  cursor:pointer; user-select:none;
-  transition:background .15s;
+.tech-hd {
+  display:flex; align-items:center; gap:.55rem;
+  padding:.9rem 1.25rem; cursor:pointer;
+  user-select:none; transition:background .15s;
+  border-bottom:1px solid transparent;
 }
-.tech-header:hover { background:rgba(124,106,247,.03); }
-.tech-chevron {
-  font-size:.72rem; color:var(--muted);
-  transition:transform .2s;
+.tech-hd:hover { background:rgba(255,255,255,.02); }
+.tech-hd.open { border-bottom-color:var(--bdr); }
+.tech-chev {
+  font-size:.65rem; color:var(--muted);
+  transition:transform .2s; line-height:1;
 }
-.tech-chevron.closed { transform:rotate(-90deg); }
-.tech-header-label {
-  font-family:'Syne', sans-serif;
-  font-size:.72rem; font-weight:600;
-  letter-spacing:.06em; text-transform:uppercase;
-  color:var(--muted);
+.tech-chev.shut { transform:rotate(-90deg); }
+.tech-hdlabel {
+  font-size:.6rem; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted);
 }
-.tech-body {
-  padding:1.5rem;
-  display:none;
-}
+.tech-body { padding:1.5rem; display:none; }
 .tech-body.open { display:block; }
 
-/* KPI row dentro do técnico */
-.kpi-row {
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:1rem; margin-bottom:1.5rem;
+/* KPIs no técnico */
+.kpis {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:.75rem; margin-bottom:1.5rem;
 }
 .kpi {
-  background:var(--surface2);
-  border:1px solid var(--border);
-  border-radius:8px;
-  padding:1rem 1.25rem;
+  background:var(--bg);
+  border:1px solid var(--bdr);
+  border-radius:8px; padding:1rem 1.25rem;
   position:relative; overflow:hidden;
 }
-.kpi::before {
+.kpi::after {
   content:''; position:absolute;
-  top:0; left:0; right:0; height:2px;
+  top:0; left:0; right:0; height:1.5px;
 }
-.kpi-20::before  { background:var(--c20); }
-.kpi-50::before  { background:var(--c50); }
-.kpi-200::before { background:var(--c200); }
-.kpi-title {
-  font-size:.62rem; letter-spacing:.1em;
+.kpi-20::after  { background:var(--c20); }
+.kpi-50::after  { background:var(--c50); }
+.kpi-200::after { background:var(--c200); }
+.kpi-lbl {
+  font-size:.58rem; letter-spacing:.1em;
   text-transform:uppercase; color:var(--muted);
   margin-bottom:.5rem;
 }
-.kpi-value {
-  font-family:'Syne', sans-serif;
-  font-size:2rem; font-weight:700;
-  line-height:1; margin-bottom:.3rem;
+.kpi-val {
+  font-family:'Syne',sans-serif;
+  font-size:1.7rem; font-weight:700; line-height:1;
+  margin-bottom:.25rem;
 }
-.kpi-20  .kpi-value { color:var(--c20); }
-.kpi-50  .kpi-value { color:var(--c50); }
-.kpi-200 .kpi-value { color:var(--c200); }
-.kpi-sub { font-size:.65rem; color:var(--muted); }
+.kpi-20  .kpi-val { color:var(--c20); }
+.kpi-50  .kpi-val { color:var(--c50); }
+.kpi-200 .kpi-val { color:var(--c200); }
+.kpi-sub { font-size:.6rem; color:var(--muted); }
 
-/* Chart de breadth técnico (3 linhas) */
-.breadth-canvas-wrap { position:relative; height:280px; }
+/* breadth chart técnico */
 .tech-legend {
-  display:flex; gap:1rem;
-  font-size:.65rem; margin-bottom:1rem;
+  display:flex; gap:.85rem;
+  font-size:.62rem; margin-bottom:.85rem;
 }
-.tech-legend-item { display:flex; align-items:center; gap:.35rem; }
-.tech-legend-dot { width:7px; height:7px; border-radius:50%; }
+.tleg { display:flex; align-items:center; gap:.3rem; }
+.tleg-dot { width:6px; height:6px; border-radius:50%; }
+.breadth-canvas { position:relative; height:240px; }
 
-/* Nota do composite */
-.composite-note {
-  margin-top:1rem;
-  padding:.75rem 1rem;
-  background:var(--surface2);
-  border:1px solid var(--border);
+/* nota metodológica */
+.method-note {
+  margin-top:1.25rem;
+  padding:.85rem 1.1rem;
+  background:var(--bg);
+  border:1px solid var(--bdr);
   border-radius:6px;
-  font-size:.65rem; color:var(--muted);
-  line-height:1.8;
+  font-size:.63rem; color:var(--muted); line-height:1.9;
 }
-.composite-note strong { color:var(--text); }
+.method-note strong { color:var(--text); }
 
 /* ── Footer ── */
 footer {
-  margin-top:3rem; padding-top:1.5rem;
-  border-top:1px solid var(--border);
-  font-size:.62rem; color:var(--muted);
+  margin-top:2.5rem; padding-top:1.5rem;
+  border-top:1px solid var(--bdr);
+  font-size:.6rem; color:var(--muted);
   display:flex; justify-content:space-between;
-  align-items:center;
 }
 
 /* ── Responsive ── */
-@media (max-width:900px) {
-  .hero { grid-template-columns:1fr; }
-  .kpi-row { grid-template-columns:1fr 1fr; }
+@media (max-width:860px) {
+  .hero { grid-template-columns:1fr; gap:1.5rem; }
+  .kpis { grid-template-columns:1fr 1fr; }
 }
-@media (max-width:600px) {
-  .kpi-row { grid-template-columns:1fr; }
-  .hero-score { font-size:3.5rem; }
+@media (max-width:520px) {
+  .page { padding:1.5rem 1rem; }
+  .hero-score { font-size:3rem; }
+  .kpis { grid-template-columns:1fr; }
 }
 </style>
 </head>
@@ -408,580 +379,410 @@ footer {
 
 <div id="loading">
   <div class="spinner"></div>
-  <span>carregando dados do IBOV...</span>
+  <span>carregando</span>
 </div>
 
-<div class="wrapper">
+<div class="page">
 
   <header>
     <div>
-      <div class="logo">IBOV <span>breadth</span></div>
-      <div class="logo-sub">participação de mercado — universo historicamente correto</div>
+      <div class="logo">IBOV <em>breadth</em></div>
     </div>
-    <div class="header-meta">
-      <div>atualizado em <span class="live" id="last-update">—</span></div>
-      <div><span id="n-constituents">—</span> constituintes · Yahoo Finance / B3</div>
+    <div class="meta">
+      <div><span class="live" id="lastUpdate">—</span></div>
+      <div><span id="nConst">—</span> ações · B3</div>
     </div>
   </header>
 
-  <div class="error-msg" id="error-msg">
-    Erro ao carregar dados. A API pode estar inicializando (primeiro acesso demora ~1 min).
-    <br/>Endpoint: <code id="api-url"></code>
+  <div class="error" id="errMsg">
+    Erro ao carregar dados. A API pode estar inicializando — aguarde ~1 min e recarregue.
+    <br/><span id="apiUrl" style="color:var(--muted)"></span>
   </div>
 
-  <!-- ══ HERO ══ -->
-  <div class="hero">
+  <!-- HERO -->
+  <div class="hero" id="hero">
+    <div class="hero-main">
+      <div class="hero-eyebrow">Composite de sentimento</div>
+      <div class="hero-score" id="heroScore">—</div>
+      <div class="hero-label" id="heroLabel">—</div>
 
-    <div class="hero-left" id="heroLeft">
-      <div>
-        <div class="hero-eyebrow">Composite de sentimento do IBOV</div>
-        <div class="hero-score" id="heroScore">—</div>
-        <div class="hero-label" id="heroLabel">—</div>
-        <div class="hero-trend" id="heroTrend">
-          <span class="trend-arrow" id="trendArrow">—</span>
-          <span id="trendText">—</span>
-          <div class="trend-tooltip" id="trendTooltip">—</div>
+      <div class="score-bar-wrap">
+        <div class="score-bar-track">
+          <div class="score-bar-needle" id="barNeedle" style="left:0%"></div>
+        </div>
+        <div class="score-bar-labels">
+          <span>0%</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100%</span>
         </div>
       </div>
-      <div class="hero-ma-row">
-        <div class="ma-pill">
-          <div class="ma-pill-dot" style="background:var(--c20)"></div>
-          <span class="ma-pill-label">MA20</span>
-          <span class="ma-pill-val" id="pill20">—</span>
-        </div>
-        <div class="ma-pill">
-          <div class="ma-pill-dot" style="background:var(--c50)"></div>
-          <span class="ma-pill-label">MA50</span>
-          <span class="ma-pill-val" id="pill50">—</span>
-        </div>
-        <div class="ma-pill">
-          <div class="ma-pill-dot" style="background:var(--c200)"></div>
-          <span class="ma-pill-label">MA200</span>
-          <span class="ma-pill-val" id="pill200">—</span>
-        </div>
+
+      <div class="hero-trend" id="heroTrend">
+        <span class="trend-sym" id="trendSym">—</span>
+        <span id="trendTxt">—</span>
+        <div class="trend-tip" id="trendTip"></div>
       </div>
     </div>
 
-    <div class="hero-right">
-      <div class="gauge-title">Termômetro de mercado</div>
-      <div class="gauge-canvas-wrap">
-        <canvas id="gaugeCanvas" width="260" height="158"></canvas>
+    <div class="hero-mas">
+      <div class="ma-row">
+        <div>
+          <div class="ma-name"><div class="ma-dot" style="background:var(--c20)"></div>MA20</div>
+          <div class="ma-bar"><div class="ma-bar-fill" id="bar20" style="background:var(--c20);width:0%"></div></div>
+        </div>
+        <div class="ma-val" id="v20" style="color:var(--c20)">—</div>
       </div>
-      <div class="gauge-below">
-        <div class="gauge-score" id="gaugeScore">—</div>
-        <div class="gauge-sublabel" id="gaugeSublabel">composite · MA200×50% MA50×35% MA20×15%</div>
+      <div class="ma-row">
+        <div>
+          <div class="ma-name"><div class="ma-dot" style="background:var(--c50)"></div>MA50</div>
+          <div class="ma-bar"><div class="ma-bar-fill" id="bar50" style="background:var(--c50);width:0%"></div></div>
+        </div>
+        <div class="ma-val" id="v50" style="color:var(--c50)">—</div>
       </div>
-    </div>
-
-  </div>
-
-  <!-- ══ LEGEND BAR ══ -->
-  <div class="legend-bar">
-    <div class="leg-item" id="leg-0" style="--leg-color:#2d7a45">
-      <div class="leg-dot" style="background:#2d7a45"></div>0–20% · Muito deprimido — aportar
-    </div>
-    <div class="leg-item" id="leg-1" style="--leg-color:#5cb85c">
-      <div class="leg-dot" style="background:#5cb85c"></div>20–40% · Abaixo da média — aportar
-    </div>
-    <div class="leg-item" id="leg-2" style="--leg-color:#f7c948">
-      <div class="leg-dot" style="background:#f7c948"></div>40–60% · Neutro
-    </div>
-    <div class="leg-item" id="leg-3" style="--leg-color:#e05c2a">
-      <div class="leg-dot" style="background:#e05c2a"></div>60–80% · Aquecido — cautela
-    </div>
-    <div class="leg-item" id="leg-4" style="--leg-color:#8b2020">
-      <div class="leg-dot" style="background:#8b2020"></div>80–100% · Sobrecomprado — evitar aportes
+      <div class="ma-row">
+        <div>
+          <div class="ma-name"><div class="ma-dot" style="background:var(--c200)"></div>MA200</div>
+          <div class="ma-bar"><div class="ma-bar-fill" id="bar200" style="background:var(--c200);width:0%"></div></div>
+        </div>
+        <div class="ma-val" id="v200" style="color:var(--c200)">—</div>
+      </div>
     </div>
   </div>
 
-  <!-- ══ GRÁFICO PRINCIPAL ══ -->
-  <div class="chart-card">
-    <div class="chart-top">
-      <span class="chart-title">Composite de sentimento — histórico</span>
-      <div class="range-btns" id="sentRangeBtns">
-        <button class="range-btn" onclick="setSentRange(90,this)">3M</button>
-        <button class="range-btn" onclick="setSentRange(180,this)">6M</button>
-        <button class="range-btn" onclick="setSentRange(365,this)">1A</button>
-        <button class="range-btn" onclick="setSentRange(730,this)">2A</button>
-        <button class="range-btn" onclick="setSentRange(1825,this)">5A</button>
-        <button class="range-btn active" onclick="setSentRange(null,this)">Máx</button>
-      </div>
-    </div>
-    <div class="chart-canvas-wrap">
-      <canvas id="sentChart"></canvas>
-    </div>
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="leg" id="leg0" style="--lc:#2d7a45"><div class="leg-dot" style="background:#2d7a45"></div>0–20% · muito deprimido</div>
+    <div class="leg" id="leg1" style="--lc:#5cb85c"><div class="leg-dot" style="background:#5cb85c"></div>20–40% · abaixo da média</div>
+    <div class="leg" id="leg2" style="--lc:#f7c948"><div class="leg-dot" style="background:#f7c948"></div>40–60% · neutro</div>
+    <div class="leg" id="leg3" style="--lc:#e05c2a"><div class="leg-dot" style="background:#e05c2a"></div>60–80% · aquecido</div>
+    <div class="leg" id="leg4" style="--lc:#8b2020"><div class="leg-dot" style="background:#8b2020"></div>80–100% · sobrecomprado</div>
   </div>
 
-  <!-- ══ SEÇÃO TÉCNICA (colapsável) ══ -->
-  <div class="tech-section">
-    <div class="tech-header" onclick="toggleTech()">
-      <span class="tech-chevron closed" id="techChevron">▼</span>
-      <span class="tech-header-label">Detalhe técnico — breadth por média móvel</span>
+  <!-- GRÁFICO PRINCIPAL -->
+  <div class="chart-wrap">
+    <div class="chart-head">
+      <span class="chart-label">Histórico do composite</span>
+      <div class="range-row" id="rangeRow">
+        <button class="rbtn" onclick="setRange(90,this)">3M</button>
+        <button class="rbtn" onclick="setRange(180,this)">6M</button>
+        <button class="rbtn" onclick="setRange(365,this)">1A</button>
+        <button class="rbtn" onclick="setRange(730,this)">2A</button>
+        <button class="rbtn" onclick="setRange(1825,this)">5A</button>
+        <button class="rbtn on" onclick="setRange(null,this)">Máx</button>
+      </div>
+    </div>
+    <div class="chart-canvas"><canvas id="sentChart"></canvas></div>
+  </div>
+
+  <!-- TÉCNICO -->
+  <div class="tech">
+    <div class="tech-hd" id="techHd" onclick="toggleTech()">
+      <span class="tech-chev shut" id="techChev">▼</span>
+      <span class="tech-hdlabel">Componentes do composite</span>
     </div>
     <div class="tech-body" id="techBody">
-      <div class="kpi-row">
+      <div class="kpis">
         <div class="kpi kpi-20">
-          <div class="kpi-title">% acima da MA20</div>
-          <div class="kpi-value" id="val-20">—</div>
-          <div class="kpi-sub">curto prazo · momentum</div>
+          <div class="kpi-lbl">% acima da MA20</div>
+          <div class="kpi-val" id="kv20">—</div>
+          <div class="kpi-sub">curto prazo</div>
         </div>
         <div class="kpi kpi-50">
-          <div class="kpi-title">% acima da MA50</div>
-          <div class="kpi-value" id="val-50">—</div>
-          <div class="kpi-sub">médio prazo · tendência</div>
+          <div class="kpi-lbl">% acima da MA50</div>
+          <div class="kpi-val" id="kv50">—</div>
+          <div class="kpi-sub">médio prazo</div>
         </div>
         <div class="kpi kpi-200">
-          <div class="kpi-title">% acima da MA200</div>
-          <div class="kpi-value" id="val-200">—</div>
-          <div class="kpi-sub">longo prazo · estrutural</div>
+          <div class="kpi-lbl">% acima da MA200</div>
+          <div class="kpi-val" id="kv200">—</div>
+          <div class="kpi-sub">longo prazo</div>
         </div>
       </div>
       <div class="tech-legend">
-        <div class="tech-legend-item"><div class="tech-legend-dot" style="background:var(--c20)"></div>MA20</div>
-        <div class="tech-legend-item"><div class="tech-legend-dot" style="background:var(--c50)"></div>MA50</div>
-        <div class="tech-legend-item"><div class="tech-legend-dot" style="background:var(--c200)"></div>MA200</div>
+        <div class="tleg"><div class="tleg-dot" style="background:var(--c20)"></div>MA20</div>
+        <div class="tleg"><div class="tleg-dot" style="background:var(--c50)"></div>MA50</div>
+        <div class="tleg"><div class="tleg-dot" style="background:var(--c200)"></div>MA200</div>
       </div>
-      <div class="breadth-canvas-wrap">
-        <canvas id="breadthChart"></canvas>
-      </div>
-      <div class="composite-note">
-        O composite pondera as três médias por seu poder preditivo sobre retornos futuros:
-        <strong>MA200 × 50%</strong> (estrutural, maior poder preditivo de médio/longo prazo) +
-        <strong>MA50 × 35%</strong> (rotações cíclicas) +
-        <strong>MA20 × 15%</strong> (momentum, sinal de divergência).
-        Metodologia: survivorship-bias-free — composição histórica do IBOV por período.
+      <div class="breadth-canvas"><canvas id="breadthChart"></canvas></div>
+      <div class="method-note">
+        O composite pondera as três médias por poder preditivo sobre retornos futuros:
+        <strong>MA200 × 50%</strong> · <strong>MA50 × 35%</strong> · <strong>MA20 × 15%</strong>.
+        Universo: composição histórica correta do IBOV por período — sem survivorship bias.
       </div>
     </div>
   </div>
 
   <footer>
-    <span>IBOV Breadth · survivorship-bias-free · dados EOD via Yahoo Finance / B3</span>
+    <span>IBOV Breadth · dados via Yahoo Finance / B3</span>
     <span>atualiza a cada 5 min no pregão</span>
   </footer>
 
-</div><!-- /wrapper -->
+</div>
 
 <script>
-// ══════════════════════════════════════════════════════════════════════
-//  CONFIG
-// ══════════════════════════════════════════════════════════════════════
-const API_BASE = window.location.origin;
-document.getElementById('api-url').textContent = API_BASE + '/api/breadth';
+const API = window.location.origin;
+document.getElementById('apiUrl').textContent = API + '/api/breadth';
 
-let allData      = [];
-let enrichedAll  = [];
-let sentChartObj = null;
-let breadthChartObj = null;
+let allData = [], enriched = [], sentObj = null, breadthObj = null;
 
-// ══════════════════════════════════════════════════════════════════════
-//  COMPOSITE + CORES
-// ══════════════════════════════════════════════════════════════════════
-function composite(b20, b50, b200) {
+// ── Composite ──────────────────────────────────────────────────────
+function comp(b20, b50, b200) {
   let s = 0, w = 0;
-  if (b200 != null) { s += b200 * 0.50; w += 0.50; }
-  if (b50  != null) { s += b50  * 0.35; w += 0.35; }
-  if (b20  != null) { s += b20  * 0.15; w += 0.15; }
-  return w === 0 ? null : s / w;
+  if (b200 != null) { s += b200*.50; w += .50; }
+  if (b50  != null) { s += b50 *.35; w += .35; }
+  if (b20  != null) { s += b20 *.15; w += .15; }
+  return w ? s/w : null;
 }
 
-function scoreToColor(v, alpha) {
-  alpha = alpha == null ? 1 : alpha;
-  const stops = [
-    [0,    [26,  77,  46]],
-    [0.15, [45,  122, 69]],
-    [0.30, [92,  184, 92]],
-    [0.42, [138, 201, 38]],
-    [0.50, [247, 201, 72]],
-    [0.62, [240, 151, 74]],
-    [0.72, [224, 92,  42]],
-    [0.83, [192, 57,  43]],
-    [1.0,  [100, 20,  20]],
+// ── Color scale ────────────────────────────────────────────────────
+function col(v, a) {
+  a = a ?? 1;
+  const st = [
+    [0,   [26,77,46]], [.15,[45,122,69]], [.30,[92,184,92]],
+    [.42,[138,201,38]], [.50,[247,201,72]], [.62,[240,151,74]],
+    [.72,[224,92,42]],  [.83,[192,57,43]], [1.0,[100,20,20]],
   ];
-  let lo = stops[0], hi = stops[stops.length - 1];
-  for (let i = 0; i < stops.length - 1; i++) {
-    if (v >= stops[i][0] && v <= stops[i+1][0]) { lo = stops[i]; hi = stops[i+1]; break; }
+  let lo=st[0], hi=st[st.length-1];
+  for (let i=0;i<st.length-1;i++) {
+    if (v>=st[i][0] && v<=st[i+1][0]) { lo=st[i]; hi=st[i+1]; break; }
   }
-  const t = lo[0] === hi[0] ? 0 : (v - lo[0]) / (hi[0] - lo[0]);
-  const r = Math.round(lo[1][0] + t * (hi[1][0] - lo[1][0]));
-  const g = Math.round(lo[1][1] + t * (hi[1][1] - lo[1][1]));
-  const b = Math.round(lo[1][2] + t * (hi[1][2] - lo[1][2]));
-  return `rgba(${r},${g},${b},${alpha})`;
+  const t = lo[0]===hi[0] ? 0 : (v-lo[0])/(hi[0]-lo[0]);
+  const r = Math.round(lo[1][0]+t*(hi[1][0]-lo[1][0]));
+  const g = Math.round(lo[1][1]+t*(hi[1][1]-lo[1][1]));
+  const b = Math.round(lo[1][2]+t*(hi[1][2]-lo[1][2]));
+  return `rgba(${r},${g},${b},${a})`;
 }
 
 function condInfo(v) {
-  if (v == null)  return { label:'—', idx:-1 };
-  if (v < 0.20)   return { label:'Mercado muito deprimido — aportar', idx:0 };
-  if (v < 0.40)   return { label:'Mercado abaixo da média — aportar', idx:1 };
-  if (v < 0.60)   return { label:'Neutro', idx:2 };
-  if (v < 0.80)   return { label:'Mercado aquecido — cautela', idx:3 };
-  return           { label:'Sobrecomprado — evitar aportes', idx:4 };
+  if (v==null) return {label:'—', idx:-1};
+  if (v<.20)   return {label:'Mercado muito deprimido — aportar', idx:0};
+  if (v<.40)   return {label:'Mercado abaixo da média — aportar', idx:1};
+  if (v<.60)   return {label:'Neutro', idx:2};
+  if (v<.80)   return {label:'Mercado aquecido — cautela', idx:3};
+  return        {label:'Sobrecomprado — evitar aportes', idx:4};
 }
 
-// Tendência: compara composite de hoje vs 20 dias atrás
-// Reflete se o SENTIMENTO (breadth composite) está melhorando ou piorando,
-// independente do preço do índice.
-function detectTrend(data) {
-  if (data.length < 21) return { dir:'flat', diff:0 };
-  const now  = data[data.length - 1].composite;
-  const prev = data[data.length - 21].composite;
-  if (now == null || prev == null) return { dir:'flat', diff:0 };
-  const diff = now - prev;
-  return {
-    dir: diff > 0.03 ? 'up' : diff < -0.03 ? 'down' : 'flat',
-    diff,
-    now, prev,
-  };
+function trend(data) {
+  if (data.length < 21) return {dir:'flat', diff:0, now:null, prev:null};
+  const now  = data[data.length-1].composite;
+  const prev = data[data.length-21].composite;
+  if (now==null||prev==null) return {dir:'flat', diff:0, now, prev};
+  const d = now-prev;
+  return {dir: d>.03?'up':d<-.03?'down':'flat', diff:d, now, prev};
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  GAUGE
-// ══════════════════════════════════════════════════════════════════════
-function drawGauge(pct) {
-  const canvas = document.getElementById('gaugeCanvas');
-  if (!canvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const W = 260, H = 158;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
+// ── Hero ───────────────────────────────────────────────────────────
+function renderHero(latest, data) {
+  const score = comp(latest.breadth_20, latest.breadth_50, latest.breadth_200);
+  if (score==null) return;
 
-  const cx = W / 2, cy = H - 14;
-  const R = W * 0.42, r = W * 0.27;
-  const steps = 200;
-
-  ctx.clearRect(0, 0, W, H);
-
-  // Arco colorizado
-  for (let i = 0; i < steps; i++) {
-    const t0 = Math.PI + (i / steps) * Math.PI;
-    const t1 = Math.PI + ((i + 1) / steps) * Math.PI;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, t0, t1);
-    ctx.arc(cx, cy, r, t1, t0, true);
-    ctx.closePath();
-    ctx.fillStyle = scoreToColor(i / steps, 1);
-    ctx.fill();
-  }
-
-  // Groove escuro
-  const bR = (R + r) / 2, bW = (R - r) * 0.32;
-  ctx.beginPath();
-  ctx.arc(cx, cy, bR + bW / 2, Math.PI, 2 * Math.PI);
-  ctx.arc(cx, cy, bR - bW / 2, 2 * Math.PI, Math.PI, true);
-  ctx.closePath();
-  ctx.fillStyle = '#0a0a0f';
-  ctx.fill();
-
-  // Ticks
-  [0, 20, 40, 60, 80, 100].forEach(t => {
-    const angle = Math.PI + (t / 100) * Math.PI;
-    ctx.font = `${W * 0.034}px 'DM Mono', monospace`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(180,180,200,.55)';
-    ctx.fillText(t, cx + (R + 14) * Math.cos(angle), cy + (R + 14) * Math.sin(angle));
-  });
-
-  // Agulha
-  if (pct != null) {
-    const ang = Math.PI + (pct / 100) * Math.PI;
-    const needleLen = r - 6;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + needleLen * Math.cos(ang), cy + needleLen * Math.sin(ang));
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  HERO RENDER
-// ══════════════════════════════════════════════════════════════════════
-function renderHero(latest, enriched) {
-  const score = composite(latest.breadth_20, latest.breadth_50, latest.breadth_200);
-  if (score == null) return;
-
-  const pct   = +(score * 100).toFixed(1);
-  const color = scoreToColor(score, 1);
+  const pct   = +(score*100).toFixed(1);
+  const color = col(score,1);
   const info  = condInfo(score);
-  const trend = detectTrend(enriched);
+  const tr    = trend(data);
+  const fmt   = v => v!=null ? (v*100).toFixed(1)+'%' : '—';
 
-  // CSS var para a cor dominante
   document.documentElement.style.setProperty('--hero-color', color);
 
-  // Score e label
-  document.getElementById('heroScore').textContent = pct + '%';
+  document.getElementById('heroScore').textContent = pct+'%';
   document.getElementById('heroLabel').textContent = info.label;
+  document.getElementById('barNeedle').style.left  = pct+'%';
 
   // Trend
-  const ARROW = { up:'↑', down:'↓', flat:'→' };
-  const TTEXT = { up:'Melhorando', down:'Piorando', flat:'Estável' };
-  const tArrow = document.getElementById('trendArrow');
-  tArrow.textContent = ARROW[trend.dir];
-  tArrow.className = 'trend-arrow trend-' + trend.dir;
-  document.getElementById('trendText').textContent = TTEXT[trend.dir];
+  const SYM = {up:'↑', down:'↓', flat:'→'};
+  const TXT = {up:'melhorando', down:'piorando', flat:'estável'};
+  const el = document.getElementById('heroTrend');
+  el.className = 'hero-trend trend-'+tr.dir;
+  document.getElementById('trendSym').textContent = SYM[tr.dir];
+  document.getElementById('trendTxt').textContent = TXT[tr.dir];
 
-  // Tooltip explicativo
-  const prev20pct = trend.prev != null ? (trend.prev * 100).toFixed(1) : '—';
-  const now20pct  = trend.now  != null ? (trend.now  * 100).toFixed(1) : '—';
-  const diffPct   = trend.diff != null ? ((trend.diff >= 0 ? '+' : '') + (trend.diff * 100).toFixed(1)) : '—';
-  document.getElementById('trendTooltip').innerHTML =
-    `Variação do composite nos últimos 20 pregões<br>` +
-    `Hoje: <strong>${now20pct}%</strong> · 20 dias atrás: <strong>${prev20pct}%</strong><br>` +
-    `Variação: <strong>${diffPct} p.p.</strong><br>` +
-    `<span style="color:var(--muted);font-size:.63rem">Reflete o sentimento, não o preço do IBOV</span>`;
+  const nowP  = tr.now  != null ? (tr.now *100).toFixed(1) : '—';
+  const prevP = tr.prev != null ? (tr.prev*100).toFixed(1) : '—';
+  const diffP = tr.diff != null ? (tr.diff>=0?'+':'')+(tr.diff*100).toFixed(1) : '—';
+  document.getElementById('trendTip').innerHTML =
+    `variação nos últimos 20 pregões<br>` +
+    `hoje <strong>${nowP}%</strong> · 20 dias atrás <strong>${prevP}%</strong><br>` +
+    `<span style="color:var(--muted)">${diffP} p.p. · mede o sentimento, não o preço</span>`;
 
-  // MA pills
-  const fmt = v => v != null ? (v * 100).toFixed(1) + '%' : '—';
-  document.getElementById('pill20').textContent  = fmt(latest.breadth_20);
-  document.getElementById('pill50').textContent  = fmt(latest.breadth_50);
-  document.getElementById('pill200').textContent = fmt(latest.breadth_200);
-
-  // Gauge
-  drawGauge(pct);
-  document.getElementById('gaugeScore').textContent = pct + '%';
+  // MAs
+  document.getElementById('v20').textContent  = fmt(latest.breadth_20);
+  document.getElementById('v50').textContent  = fmt(latest.breadth_50);
+  document.getElementById('v200').textContent = fmt(latest.breadth_200);
+  document.getElementById('bar20').style.width  = fmt(latest.breadth_20);
+  document.getElementById('bar50').style.width  = fmt(latest.breadth_50);
+  document.getElementById('bar200').style.width = fmt(latest.breadth_200);
 
   // KPIs técnicos
-  document.getElementById('val-20').textContent  = fmt(latest.breadth_20);
-  document.getElementById('val-50').textContent  = fmt(latest.breadth_50);
-  document.getElementById('val-200').textContent = fmt(latest.breadth_200);
+  document.getElementById('kv20').textContent  = fmt(latest.breadth_20);
+  document.getElementById('kv50').textContent  = fmt(latest.breadth_50);
+  document.getElementById('kv200').textContent = fmt(latest.breadth_200);
 
-  // Header meta
-  document.getElementById('last-update').textContent    = latest.date || '—';
-  document.getElementById('n-constituents').textContent = latest.n_constituents || '—';
+  // Header
+  document.getElementById('lastUpdate').textContent = latest.date || '—';
+  document.getElementById('nConst').textContent     = latest.n_constituents || '—';
 
-  // Legend highlight
-  for (let i = 0; i <= 4; i++) {
-    document.getElementById('leg-' + i).classList.toggle('active', i === info.idx);
-  }
+  // Legend
+  for (let i=0;i<=4;i++)
+    document.getElementById('leg'+i).classList.toggle('on', i===info.idx);
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  GRÁFICO SENTIMENTO (principal)
-// ══════════════════════════════════════════════════════════════════════
-function renderSentChart(data) {
+// ── Gráfico sentimento ─────────────────────────────────────────────
+function renderSent(data) {
   const ctx = document.getElementById('sentChart').getContext('2d');
-  if (sentChartObj) sentChartObj.destroy();
+  if (sentObj) sentObj.destroy();
 
-  sentChartObj = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: data.map(d => d.date),
-      datasets: [{
-        label: 'Sentimento',
-        data: data.map(d => d.composite != null ? +(d.composite * 100).toFixed(2) : null),
-        borderWidth: 2.5,
-        pointRadius: 0,
-        tension: 0.3,
-        fill: false,
-        spanGaps: false,
-        segment: {
-          borderColor: ctx => {
-            const v = ctx.p0.parsed.y;
-            return v == null ? 'transparent' : scoreToColor(v / 100, 0.95);
-          },
-        },
+  sentObj = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: data.map(d=>d.date),
+      datasets:[{
+        data: data.map(d=>d.composite!=null ? +(d.composite*100).toFixed(2) : null),
+        borderWidth:2.5, pointRadius:0, tension:0.3,
+        fill:false, spanGaps:false,
+        segment:{ borderColor: c => {
+          const v = c.p0.parsed.y;
+          return v==null ? 'transparent' : col(v/100,.95);
+        }},
       }],
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 400 },
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#111118',
-          borderColor: '#1e1e2e',
-          borderWidth: 1,
-          titleColor: '#6b6b8a',
-          bodyColor: '#e2e2f0',
-          callbacks: {
-            label: ctx => {
-              const v = ctx.parsed.y;
-              if (v == null) return '—';
-              const info = condInfo(v / 100);
-              return `Sentimento: ${v.toFixed(1)}%  ·  ${info.label}`;
-            },
-          },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      animation:{duration:350},
+      interaction:{mode:'index', intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0f0f17', borderColor:'#1c1c2a',
+          borderWidth:1, titleColor:'#64647e', bodyColor:'#ddddf0',
+          callbacks:{ label: c => {
+            const v = c.parsed.y;
+            if (v==null) return '—';
+            return `${v.toFixed(1)}%  ·  ${condInfo(v/100).label}`;
+          }},
         },
       },
-      scales: {
-        x: {
-          grid: { color: 'rgba(30,30,46,.5)' },
-          ticks: { color: '#6b6b8a', font: { family:"'DM Mono'", size:10 }, maxTicksLimit:10, maxRotation:0 },
-        },
-        y: {
-          min: 0, max: 100,
-          grid: { color: 'rgba(30,30,46,.5)' },
-          ticks: { color: '#6b6b8a', font: { family:"'DM Mono'", size:10 }, callback: v => v + '%' },
-        },
+      scales:{
+        x:{ grid:{color:'rgba(28,28,42,.8)'}, ticks:{color:'#64647e', font:{family:"'DM Mono'",size:10}, maxTicksLimit:10, maxRotation:0} },
+        y:{ min:0, max:100, grid:{color:'rgba(28,28,42,.8)'}, ticks:{color:'#64647e', font:{family:"'DM Mono'",size:10}, callback:v=>v+'%'} },
       },
     },
-    plugins: [{
-      id: 'sentBgZones',
-      beforeDraw(chart) {
-        const { ctx, scales: { y, x } } = chart;
-        [
-          [0,  20,  'rgba(45,122,69,.07)'],
-          [20, 40,  'rgba(92,184,92,.04)'],
-          [40, 60,  'rgba(247,201,72,.035)'],
-          [60, 80,  'rgba(224,92,42,.04)'],
-          [80, 100, 'rgba(139,0,0,.07)'],
-        ].forEach(([lo, hi, color]) => {
-          ctx.save();
-          ctx.fillStyle = color;
-          ctx.fillRect(x.left, y.getPixelForValue(hi), x.right - x.left, y.getPixelForValue(lo) - y.getPixelForValue(hi));
+    plugins:[{
+      id:'zones',
+      beforeDraw(ch) {
+        const {ctx,scales:{y,x}} = ch;
+        [[0,20,'rgba(45,122,69,.07)'],[20,40,'rgba(92,184,92,.04)'],
+         [40,60,'rgba(247,201,72,.035)'],[60,80,'rgba(224,92,42,.04)'],
+         [80,100,'rgba(139,0,0,.07)']].forEach(([lo,hi,c])=>{
+          ctx.save(); ctx.fillStyle=c;
+          ctx.fillRect(x.left,y.getPixelForValue(hi),x.right-x.left,y.getPixelForValue(lo)-y.getPixelForValue(hi));
           ctx.restore();
         });
-        // Linha 50%
         ctx.save();
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(247,201,72,.15)';
-        ctx.setLineDash([4, 6]);
-        ctx.lineWidth = 1;
-        ctx.moveTo(x.left, y.getPixelForValue(50));
-        ctx.lineTo(x.right, y.getPixelForValue(50));
-        ctx.stroke();
-        ctx.restore();
+        ctx.beginPath(); ctx.strokeStyle='rgba(247,201,72,.12)';
+        ctx.setLineDash([4,6]); ctx.lineWidth=1;
+        ctx.moveTo(x.left,y.getPixelForValue(50)); ctx.lineTo(x.right,y.getPixelForValue(50));
+        ctx.stroke(); ctx.restore();
       },
     }],
   });
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  GRÁFICO TÉCNICO (breadth 3 linhas — colapsável)
-// ══════════════════════════════════════════════════════════════════════
-function renderBreadthChart(data) {
+// ── Gráfico breadth técnico ────────────────────────────────────────
+function renderBreadth(data) {
   const ctx = document.getElementById('breadthChart').getContext('2d');
-  if (breadthChartObj) breadthChartObj.destroy();
+  if (breadthObj) breadthObj.destroy();
 
-  const b20  = data.map(d => d.breadth_20  != null ? +(d.breadth_20  * 100).toFixed(2) : null);
-  const b50  = data.map(d => d.breadth_50  != null ? +(d.breadth_50  * 100).toFixed(2) : null);
-  const b200 = data.map(d => d.breadth_200 != null ? +(d.breadth_200 * 100).toFixed(2) : null);
-
-  breadthChartObj = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: data.map(d => d.date),
-      datasets: [
-        { label:'MA20',  data:b20,  borderColor:'rgba(61,255,160,.7)',   backgroundColor:'transparent', borderWidth:1,   pointRadius:0, tension:0.2, spanGaps:false },
-        { label:'MA50',  data:b50,  borderColor:'rgba(247,201,72,.8)',   backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.2, spanGaps:false },
-        { label:'MA200', data:b200, borderColor:'rgba(124,106,247,.95)', backgroundColor:'rgba(124,106,247,.04)', borderWidth:2.5, pointRadius:0, tension:0.3, fill:true, spanGaps:false },
+  breadthObj = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: data.map(d=>d.date),
+      datasets:[
+        {label:'MA20',  data:data.map(d=>d.breadth_20 !=null?+(d.breadth_20 *100).toFixed(2):null), borderColor:'rgba(61,255,160,.65)',  backgroundColor:'transparent', borderWidth:1,   pointRadius:0, tension:0.2, spanGaps:false},
+        {label:'MA50',  data:data.map(d=>d.breadth_50 !=null?+(d.breadth_50 *100).toFixed(2):null), borderColor:'rgba(247,201,72,.75)',  backgroundColor:'transparent', borderWidth:1.5, pointRadius:0, tension:0.2, spanGaps:false},
+        {label:'MA200', data:data.map(d=>d.breadth_200!=null?+(d.breadth_200*100).toFixed(2):null), borderColor:'rgba(124,106,247,.95)', backgroundColor:'rgba(124,106,247,.04)', borderWidth:2.5, pointRadius:0, tension:0.3, fill:true, spanGaps:false},
       ],
     },
-    options: {
+    options:{
       responsive:true, maintainAspectRatio:false,
-      animation:{ duration:400 },
-      interaction:{ mode:'index', intersect:false },
-      plugins: {
-        legend:{ display:false },
-        tooltip: {
-          backgroundColor:'#111118', borderColor:'#1e1e2e', borderWidth:1,
-          titleColor:'#6b6b8a', bodyColor:'#e2e2f0',
-          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1)}%` },
-        },
+      animation:{duration:350},
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#0f0f17',borderColor:'#1c1c2a',borderWidth:1,titleColor:'#64647e',bodyColor:'#ddddf0',
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y?.toFixed(1)}%`}},
       },
-      scales: {
-        x: { grid:{ color:'rgba(30,30,46,.5)' }, ticks:{ color:'#6b6b8a', font:{ family:"'DM Mono'", size:10 }, maxTicksLimit:10, maxRotation:0 } },
-        y: { min:0, max:100, grid:{ color:'rgba(30,30,46,.5)' }, ticks:{ color:'#6b6b8a', font:{ family:"'DM Mono'", size:10 }, callback: v => v + '%' } },
+      scales:{
+        x:{grid:{color:'rgba(28,28,42,.8)'},ticks:{color:'#64647e',font:{family:"'DM Mono'",size:10},maxTicksLimit:10,maxRotation:0}},
+        y:{min:0,max:100,grid:{color:'rgba(28,28,42,.8)'},ticks:{color:'#64647e',font:{family:"'DM Mono'",size:10},callback:v=>v+'%'}},
       },
     },
-    plugins: [{
-      id: 'breadthThresholds',
-      afterDraw(chart) {
-        const { ctx, scales:{ x, y } } = chart;
-        [20, 50, 80].forEach(level => {
-          const yPos = y.getPixelForValue(level);
+    plugins:[{
+      id:'thresholds',
+      afterDraw(ch) {
+        const {ctx,scales:{x,y}} = ch;
+        [20,50,80].forEach(lv=>{
+          const yp = y.getPixelForValue(lv);
           ctx.save();
-          ctx.beginPath();
-          ctx.strokeStyle = level === 50 ? 'rgba(247,201,72,.2)' : 'rgba(107,107,138,.2)';
-          ctx.setLineDash([4, 6]);
-          ctx.lineWidth = 1;
-          ctx.moveTo(x.left, yPos);
-          ctx.lineTo(x.right, yPos);
-          ctx.stroke();
-          ctx.fillStyle = 'rgba(107,107,138,.45)';
-          ctx.font = "10px 'DM Mono'";
-          ctx.fillText(level + '%', x.right + 4, yPos + 3);
-          ctx.restore();
+          ctx.beginPath(); ctx.strokeStyle=lv===50?'rgba(247,201,72,.18)':'rgba(100,100,126,.2)';
+          ctx.setLineDash([4,6]); ctx.lineWidth=1;
+          ctx.moveTo(x.left,yp); ctx.lineTo(x.right,yp); ctx.stroke();
+          ctx.fillStyle='rgba(100,100,126,.4)'; ctx.font="10px 'DM Mono'";
+          ctx.fillText(lv+'%',x.right+4,yp+3); ctx.restore();
         });
       },
     }],
   });
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  RANGE FILTER — gráfico sentimento
-// ══════════════════════════════════════════════════════════════════════
-function setSentRange(days, btn) {
-  document.querySelectorAll('#sentRangeBtns .range-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  if (!days) {
-    renderSentChart(enrichedAll);
-    return;
-  }
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-  const filtered = enrichedAll.filter(d => new Date(d.date) >= cutoff);
-  renderSentChart(filtered);
+// ── Range filter ───────────────────────────────────────────────────
+function setRange(days, btn) {
+  document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const data = days
+    ? enriched.filter(d=>new Date(d.date)>=new Date(Date.now()-days*864e5))
+    : enriched;
+  renderSent(data);
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  TOGGLE TÉCNICO
-// ══════════════════════════════════════════════════════════════════════
+// ── Toggle técnico ─────────────────────────────────────────────────
 let techOpen = false;
 function toggleTech() {
   techOpen = !techOpen;
   document.getElementById('techBody').classList.toggle('open', techOpen);
-  document.getElementById('techChevron').classList.toggle('closed', !techOpen);
-  if (techOpen && allData.length) renderBreadthChart(allData);
+  document.getElementById('techChev').classList.toggle('shut', !techOpen);
+  document.getElementById('techHd').classList.toggle('open', techOpen);
+  if (techOpen) renderBreadth(allData);
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════════════════════════════
+// ── Init ───────────────────────────────────────────────────────────
 async function init() {
   try {
-    const [latestRes, histRes] = await Promise.all([
-      fetch(`${API_BASE}/api/breadth/latest`),
-      fetch(`${API_BASE}/api/breadth`),
+    const [lr, hr] = await Promise.all([
+      fetch(`${API}/api/breadth/latest`),
+      fetch(`${API}/api/breadth`),
     ]);
-    if (!latestRes.ok || !histRes.ok) throw new Error('API não respondeu');
+    if (!lr.ok||!hr.ok) throw new Error('api error');
 
-    const latest = await latestRes.json();
-    const hist   = await histRes.json();
+    const latest = await lr.json();
+    const hist   = await hr.json();
 
-    allData = hist.data;
+    allData  = hist.data;
+    enriched = allData
+      .map(d=>({...d, composite:comp(d.breadth_20,d.breadth_50,d.breadth_200)}))
+      .filter(d=>d.composite!=null);
 
-    // Enriquecer com composite
-    enrichedAll = allData
-      .map(d => ({ ...d, composite: composite(d.breadth_20, d.breadth_50, d.breadth_200) }))
-      .filter(d => d.composite != null);
-
-    renderHero(latest, enrichedAll);
-    renderSentChart(enrichedAll);
+    renderHero(latest, enriched);
+    renderSent(enriched);
 
     document.getElementById('loading').classList.add('hidden');
 
-  } catch (err) {
+  } catch(e) {
     document.getElementById('loading').classList.add('hidden');
-    document.getElementById('error-msg').classList.add('visible');
-    console.error(err);
+    document.getElementById('errMsg').classList.add('on');
+    console.error(e);
   }
 }
 
 init();
-setInterval(init, 5 * 60 * 1000);
+setInterval(init, 5*60*1000);
 </script>
 </body>
 </html>
