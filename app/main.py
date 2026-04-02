@@ -158,10 +158,14 @@ def get_breadth_latest():
         "breadth_200": round(float(b200), 4) if b200 is not None and not np.isnan(b200) else None,
         "regime":   classify_regime(b200),
         "n_constituents": int(last.get("n_constituents", 0)),
+        # Weights grounded in forward-return predictability research:
+        # MA200: 50% — strongest predictor of medium/long-term returns
+        # MA50:  35% — cyclical rotations, overbought/oversold signals
+        # MA20:  15% — momentum trigger, high noise, small weight
         "composite": round(
-            0.2 * (float(b20 or 0)) +
-            0.3 * (float(b50 or 0)) +
-            0.5 * (float(b200 or 0)),
+            0.15 * (float(b20  or 0)) +
+            0.35 * (float(b50  or 0)) +
+            0.50 * (float(b200 or 0)),
             4
         ),
     }
