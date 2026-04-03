@@ -939,7 +939,10 @@ function renderIbovChart(data) {
                 ? Math.round(d.close).toLocaleString('pt-BR')
                 : '—';
               const info = condInfo(d?.composite);
-              return [`${close} pts`, info.label];
+              const compPct = d?.composite != null
+                ? (d.composite * 100).toFixed(1) + '%'
+                : '—';
+              return [`${close} pts`, `composite ${compPct}  ·  ${info.label}`];
             },
           },
         },
