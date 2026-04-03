@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>IBOV Breadth</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
@@ -370,6 +372,49 @@ footer {
   margin-top:.5rem; text-align:right;
 }
 
+/* ── Zoom controls ── */
+.zoom-controls {
+  display:none; align-items:center; gap:.4rem;
+}
+.zoom-controls.visible { display:flex; }
+.zoom-reset {
+  background:rgba(124,106,247,.12);
+  border:1px solid rgba(124,106,247,.3);
+  color:#7c6af7;
+  font-family:'DM Mono',monospace;
+  font-size:.62rem; padding:.2rem .6rem;
+  border-radius:4px; cursor:pointer;
+  transition:all .15s;
+}
+.zoom-reset:hover { background:rgba(124,106,247,.22); }
+
+/* ── Measure tooltip ── */
+.measure-tip {
+  display:none;
+  position:absolute;
+  background:#1c1c2a;
+  border:1px solid #26263a;
+  border-radius:6px;
+  padding:.5rem .85rem;
+  font-size:.72rem;
+  color:#ddddf0;
+  pointer-events:none;
+  z-index:50;
+  white-space:nowrap;
+  line-height:1.7;
+}
+.measure-tip .mt-date { color:#64647e; font-size:.65rem; }
+.measure-tip .mt-val  { font-family:'Syne',sans-serif; font-weight:700; font-size:1rem; }
+.measure-tip .mt-pos  { color:#3dffa0; }
+.measure-tip .mt-neg  { color:#ff6b7a; }
+
+/* ── Hint shift+drag ── */
+.chart-hint {
+  font-size:.6rem; color:#64647e;
+  margin-top:.35rem; text-align:right;
+  letter-spacing:.02em;
+}
+
 /* ── Responsive ── */
 @media (max-width:860px) {
   .hero { grid-template-columns:1fr; gap:1.5rem; }
@@ -474,9 +519,16 @@ footer {
         <button class="rbtn" onclick="setIbovRange(730,this)">2A</button>
         <button class="rbtn" onclick="setIbovRange(1825,this)">5A</button>
         <button class="rbtn on" onclick="setIbovRange(null,this)">Máx</button>
+        <div class="zoom-controls" id="ibovZoomCtrl">
+          <button class="zoom-reset" onclick="resetZoom('ibov')">↺ resetar zoom</button>
+        </div>
       </div>
     </div>
-    <div class="chart-canvas"><canvas id="ibovChart"></canvas></div>
+    <div style="position:relative">
+      <div class="chart-canvas"><canvas id="ibovChart"></canvas></div>
+      <div class="measure-tip" id="ibovMeasure"></div>
+    </div>
+    <div class="chart-hint">scroll para zoom · shift+drag para medir</div>
     <div class="ibov-note">cor = composite de sentimento · verde escuro = muito deprimido · vermelho = sobrecomprado</div>
   </div>
 
@@ -491,9 +543,16 @@ footer {
         <button class="rbtn" onclick="setRange(730,this)">2A</button>
         <button class="rbtn" onclick="setRange(1825,this)">5A</button>
         <button class="rbtn on" onclick="setRange(null,this)">Máx</button>
+        <div class="zoom-controls" id="sentZoomCtrl">
+          <button class="zoom-reset" onclick="resetZoom('sent')">↺ resetar zoom</button>
+        </div>
       </div>
     </div>
-    <div class="chart-canvas"><canvas id="sentChart"></canvas></div>
+    <div style="position:relative">
+      <div class="chart-canvas"><canvas id="sentChart"></canvas></div>
+      <div class="measure-tip" id="sentMeasure"></div>
+    </div>
+    <div class="chart-hint">scroll para zoom · shift+drag para medir</div>
   </div>
 
   <!-- TÉCNICO -->
@@ -525,7 +584,16 @@ footer {
         <div class="tleg"><div class="tleg-dot" style="background:var(--c50)"></div>MA50</div>
         <div class="tleg"><div class="tleg-dot" style="background:var(--c200)"></div>MA200</div>
       </div>
-      <div class="breadth-canvas"><canvas id="breadthChart"></canvas></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:.35rem">
+        <div class="zoom-controls" id="breadthZoomCtrl">
+          <button class="zoom-reset" onclick="resetZoom('breadth')">↺ resetar zoom</button>
+        </div>
+      </div>
+      <div style="position:relative">
+        <div class="breadth-canvas"><canvas id="breadthChart"></canvas></div>
+        <div class="measure-tip" id="breadthMeasure"></div>
+      </div>
+      <div class="chart-hint">scroll para zoom · shift+drag para medir</div>
       <div class="method-note">
         O composite pondera as três médias por poder preditivo sobre retornos futuros:
         <strong>MA200 × 50%</strong> · <strong>MA50 × 35%</strong> · <strong>MA20 × 15%</strong>.
@@ -687,6 +755,12 @@ function renderSent(data) {
         x:{ grid:{color:'rgba(28,28,42,.8)'}, ticks:{color:'#64647e', font:{family:"'DM Mono'",size:10}, maxTicksLimit:10, maxRotation:0} },
         y:{ min:0, max:100, grid:{color:'rgba(28,28,42,.8)'}, ticks:{color:'#64647e', font:{family:"'DM Mono'",size:10}, callback:v=>v+'%'} },
       },
+      plugins:{zoom:{
+          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
+            onZoom:({chart})=>showZoomReset(chart)},
+          pan:{enabled:true,mode:'x',
+            onPan:({chart})=>showZoomReset(chart)},
+        }},
     },
     plugins:[{
       id:'zones',
@@ -707,6 +781,7 @@ function renderSent(data) {
       },
     }],
   });
+  chartRegistry['sent'] = sentObj;
 }
 
 // ── Gráfico breadth técnico ────────────────────────────────────────
@@ -737,6 +812,12 @@ function renderBreadth(data) {
         x:{grid:{color:'rgba(28,28,42,.8)'},ticks:{color:'#64647e',font:{family:"'DM Mono'",size:10},maxTicksLimit:10,maxRotation:0}},
         y:{min:0,max:100,grid:{color:'rgba(28,28,42,.8)'},ticks:{color:'#64647e',font:{family:"'DM Mono'",size:10},callback:v=>v+'%'}},
       },
+      plugins:{zoom:{
+          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
+            onZoom:({chart})=>showZoomReset(chart)},
+          pan:{enabled:true,mode:'x',
+            onPan:({chart})=>showZoomReset(chart)},
+        }},
     },
     plugins:[{
       id:'thresholds',
@@ -754,6 +835,7 @@ function renderBreadth(data) {
       },
     }],
   });
+  chartRegistry['breadth'] = breadthObj;
 }
 
 // ── Range filter ───────────────────────────────────────────────────
@@ -864,8 +946,15 @@ function renderIbovChart(data) {
           },
         },
       },
+      plugins:{zoom:{
+          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
+            onZoom:({chart})=>showZoomReset(chart)},
+          pan:{enabled:true,mode:'x',
+            onPan:({chart})=>showZoomReset(chart)},
+        }},
     },
   });
+  chartRegistry['ibov'] = ibovChartObj;
 }
 
 function setIbovRange(days, btn) {
@@ -889,6 +978,145 @@ async function loadIbovPrice() {
     const wrap = document.getElementById('ibovChartWrap');
     if (wrap) wrap.style.display = 'none';
   }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+//  ZOOM RESET
+// ══════════════════════════════════════════════════════════════════════
+const chartRegistry = {};  // 'sent' | 'ibov' | 'breadth' → Chart instance
+
+function showZoomReset(chart) {
+  const id = Object.keys(chartRegistry).find(k => chartRegistry[k] === chart);
+  if (id) document.getElementById(id+'ZoomCtrl')?.classList.add('visible');
+}
+
+function resetZoom(id) {
+  chartRegistry[id]?.resetZoom();
+  document.getElementById(id+'ZoomCtrl')?.classList.remove('visible');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  MEDIÇÃO SHIFT+DRAG
+// ══════════════════════════════════════════════════════════════════════
+function setupMeasure(canvasId, tipId, chartKey, getYLabel) {
+  const canvas = document.getElementById(canvasId);
+  const tip    = document.getElementById(tipId);
+  if (!canvas || !tip) return;
+
+  let measuring = false;
+  let startX = 0, startY = 0;
+  let startVal = null, startDate = null;
+
+  // overlay canvas para desenhar o retângulo
+  const overlay = document.createElement('canvas');
+  overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
+  canvas.parentNode.style.position = 'relative';
+  canvas.parentNode.appendChild(overlay);
+
+  function resize() {
+    overlay.width  = canvas.offsetWidth;
+    overlay.height = canvas.offsetHeight;
+  }
+  resize();
+  new ResizeObserver(resize).observe(canvas);
+
+  function getDataAtX(px) {
+    const chart = chartRegistry[chartKey];
+    if (!chart) return null;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    if (!xScale || !yScale) return null;
+    const idx = Math.round(xScale.getValueForPixel(px));
+    const ds  = chart.data.datasets[0];
+    if (!ds || idx < 0 || idx >= ds.data.length) return null;
+    return { val: ds.data[idx], label: chart.data.labels[idx], idx };
+  }
+
+  canvas.addEventListener('mousedown', e => {
+    if (!e.shiftKey) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+    const d = getDataAtX(startX);
+    if (!d || d.val == null) return;
+    startVal  = d.val;
+    startDate = d.label;
+    measuring = true;
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!measuring) return;
+    const rect   = canvas.getBoundingClientRect();
+    const curX   = e.clientX - rect.left;
+    const curY   = e.clientY - rect.top;
+    const d      = getDataAtX(curX);
+
+    // Desenhar retângulo
+    const ctx2 = overlay.getContext('2d');
+    ctx2.clearRect(0, 0, overlay.width, overlay.height);
+    ctx2.fillStyle = 'rgba(124,106,247,.08)';
+    ctx2.strokeStyle = 'rgba(124,106,247,.4)';
+    ctx2.lineWidth = 1;
+    const x1 = Math.min(startX, curX);
+    const x2 = Math.max(startX, curX);
+    ctx2.fillRect(x1, 0, x2-x1, overlay.height);
+    ctx2.strokeRect(x1, 0, x2-x1, overlay.height);
+
+    if (!d || d.val == null) return;
+    const endVal  = d.val;
+    const endDate = d.label;
+    const diff    = endVal - startVal;
+    const pct     = startVal !== 0 ? (diff / Math.abs(startVal)) * 100 : 0;
+    const cls     = diff >= 0 ? 'mt-pos' : 'mt-neg';
+    const sign    = diff >= 0 ? '+' : '';
+
+    tip.innerHTML = `
+      <div class="mt-date">${startDate} → ${endDate}</div>
+      <div class="mt-val ${cls}">${sign}${getYLabel(diff, pct)}</div>
+    `;
+    // Posicionar tooltip
+    const tipW = 200;
+    let tx = curX + 12;
+    if (tx + tipW > canvas.offsetWidth) tx = curX - tipW - 12;
+    tip.style.left = tx + 'px';
+    tip.style.top  = Math.max(0, curY - 40) + 'px';
+    tip.style.display = 'block';
+  });
+
+  window.addEventListener('mouseup', e => {
+    if (!measuring) return;
+    measuring = false;
+    const ctx2 = overlay.getContext('2d');
+    ctx2.clearRect(0, 0, overlay.width, overlay.height);
+    setTimeout(() => { tip.style.display = 'none'; }, 2000);
+  });
+
+  // Cancelar se soltar shift
+  window.addEventListener('keyup', e => {
+    if (e.key === 'Shift' && measuring) {
+      measuring = false;
+      const ctx2 = overlay.getContext('2d');
+      ctx2.clearRect(0, 0, overlay.width, overlay.height);
+      tip.style.display = 'none';
+    }
+  });
+}
+
+function initMeasureAll() {
+  // IBOV: valor em pontos
+  setupMeasure('ibovChart', 'ibovMeasure', 'ibov',
+    (diff, pct) => `${diff >= 0 ? '+' : ''}${diff.toFixed(0)} pts  (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+  );
+  // Composite: valor em %
+  setupMeasure('sentChart', 'sentMeasure', 'sent',
+    (diff, pct) => `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} p.p.  (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+  );
+  // Breadth técnico: valor em %
+  setupMeasure('breadthChart', 'breadthMeasure', 'breadth',
+    (diff, pct) => `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} p.p.  (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+  );
 }
 
 async function init() {
@@ -916,6 +1144,12 @@ async function init() {
 
     renderHero(latest, enriched);
     renderSent(enriched);
+
+    // Inicializar medição em todos os gráficos (só na primeira vez)
+    if (!window._measureInited) {
+      window._measureInited = true;
+      setTimeout(initMeasureAll, 300);
+    }
 
     document.getElementById('loading').classList.add('hidden');
 
