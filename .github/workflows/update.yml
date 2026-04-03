@@ -2,8 +2,8 @@ name: IBOV Breadth Update
 
 on:
   schedule:
-    # A cada 15 min, seg–sex, 09:00–18:30 BRT (12:00–21:30 UTC)
-    - cron: "0,15,30,45 12-21 * * 1-5"
+    # A cada hora, seg–sex, 10:30–18:30 BRT (13:30–21:30 UTC)
+    - cron: "30 13-21 * * 1-5"
   workflow_dispatch:  # permite trigger manual
 
 permissions:
