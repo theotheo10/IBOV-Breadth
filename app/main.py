@@ -226,3 +226,70 @@ def get_regime_history():
         })
 
     return {"data": records, "count": len(records)}
+
+
+# ── IBOV Price endpoint ───────────────────────────────────────────────────────
+
+IBOV_PATH = Path("data") / "ibov_price.parquet"
+
+def _fetch_ibov_price() -> pd.DataFrame:
+    """Fetch ^BVSP historical close prices via yfinance and cache to parquet."""
+    import yfinance as yf
+    from datetime import datetime, timedelta
+
+    logger.info("Fetching ^BVSP price history...")
+    raw = yf.download(
+        "^BVSP",
+        start="2013-07-01",
+        end=(datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d"),
+        auto_adjust=True,
+        progress=False,
+        threads=False,
+    )
+    if raw.empty:
+        raise RuntimeError("yfinance returned empty data for ^BVSP")
+
+    close = raw["Close"].squeeze().dropna()
+    close.index = pd.to_datetime(close.index).normalize()
+    close.name = "close"
+    df = close.to_frame()
+    df.index.name = "date"
+    df.to_parquet(IBOV_PATH)
+    logger.info(f"^BVSP saved — {len(df)} rows, up to {df.index.max().date()}")
+    return df
+
+
+def _load_ibov_price(force_refresh: bool = False) -> pd.DataFrame:
+    from datetime import datetime, timedelta
+
+    if IBOV_PATH.exists() and not force_refresh:
+        df = pd.read_parquet(IBOV_PATH)
+        # Refresh if last date is more than 1 day old
+        last = df.index.max()
+        if (pd.Timestamp.today().normalize() - last).days > 1:
+            try:
+                df = _fetch_ibov_price()
+            except Exception as e:
+                logger.warning(f"IBOV price refresh failed, using cached: {e}")
+        return df
+
+    return _fetch_ibov_price()
+
+
+@app.get("/api/ibov")
+def get_ibov_price():
+    """
+    Historical ^BVSP (Ibovespa) daily close prices.
+    Cached locally, refreshed automatically when stale.
+    Returns: [{date, close}, ...]
+    """
+    try:
+        df = _load_ibov_price()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IBOV price error: {str(e)}")
+
+    records = [
+        {"date": idx.strftime("%Y-%m-%d"), "close": round(float(row["close"]), 2)}
+        for idx, row in df.iterrows()
+    ]
+    return {"data": records, "count": len(records)}
