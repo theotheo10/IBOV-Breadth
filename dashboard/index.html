@@ -550,9 +550,7 @@ footer {
     </div>
     <div style="position:relative">
       <div class="chart-canvas"><canvas id="sentChart"></canvas></div>
-      <div class="measure-tip" id="sentMeasure"></div>
     </div>
-    <div class="chart-hint">scroll para zoom · drag para medir · shift+drag para pan</div>
   </div>
 
   <!-- TÉCNICO -->
@@ -591,9 +589,7 @@ footer {
       </div>
       <div style="position:relative">
         <div class="breadth-canvas"><canvas id="breadthChart"></canvas></div>
-        <div class="measure-tip" id="breadthMeasure"></div>
       </div>
-      <div class="chart-hint">scroll para zoom · drag para medir · shift+drag para pan</div>
       <div class="method-note">
         O composite pondera as três médias por poder preditivo sobre retornos futuros:
         <strong>MA200 × 50%</strong> · <strong>MA50 × 35%</strong> · <strong>MA20 × 15%</strong>.
@@ -1201,17 +1197,9 @@ function setupMeasure(canvasId, tipId, chartKey, getYLabel) {
 }
 
 function initMeasureAll() {
-  // IBOV: valor em pontos — getYLabel recebe valor absoluto
+  // Medição apenas no gráfico do IBOV (faz sentido comparar preço)
   setupMeasure('ibovChart', 'ibovMeasure', 'ibov',
     (abs, absPct) => `${abs.toFixed(0)} pts  (${absPct.toFixed(1)}%)`
-  );
-  // Composite: p.p.
-  setupMeasure('sentChart', 'sentMeasure', 'sent',
-    (abs, absPct) => `${abs.toFixed(1)} p.p.  (${absPct.toFixed(1)}%)`
-  );
-  // Breadth técnico: p.p.
-  setupMeasure('breadthChart', 'breadthMeasure', 'breadth',
-    (abs, absPct) => `${abs.toFixed(1)} p.p.  (${absPct.toFixed(1)}%)`
   );
 }
 
