@@ -6,6 +6,9 @@ on:
     - cron: "0,15,30,45 12-21 * * 1-5"
   workflow_dispatch:  # permite trigger manual
 
+permissions:
+  contents: write
+
 jobs:
   update:
     runs-on: ubuntu-latest

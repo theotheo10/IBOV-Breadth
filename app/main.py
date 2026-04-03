@@ -293,3 +293,40 @@ def get_ibov_price():
         for idx, row in df.iterrows()
     ]
     return {"data": records, "count": len(records)}
+
+# ── IBOV Price endpoint ───────────────────────────────────────────────────────
+
+IBOV_PRICE_PATH = Path("data") / "ibov_price.parquet"
+
+
+def _load_or_fetch_ibov() -> pd.DataFrame:
+    """
+    Load cached ^BVSP prices. If stale or missing, fetch via yfinance.
+    Called by the API (Render) — only reads cache.
+    The daily_update.py job on GitHub Actions writes the cache.
+    """
+    if IBOV_PRICE_PATH.exists():
+        return pd.read_parquet(IBOV_PRICE_PATH)
+    raise FileNotFoundError("ibov_price.parquet not found — run daily_update.py first")
+
+
+@app.get("/api/ibov")
+def get_ibov_price():
+    """
+    Historical ^BVSP daily close prices (cached parquet, updated by GitHub Actions).
+    Returns: [{date, close}, ...]
+    """
+    try:
+        df = _load_or_fetch_ibov()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"IBOV price error: {str(e)}")
+
+    records = [
+        {"date": idx.strftime("%Y-%m-%d"), "close": round(float(row["close"]), 2)}
+        for idx, row in df.iterrows()
+        if pd.notna(row["close"])
+    ]
+    return {"data": records, "count": len(records)}
+

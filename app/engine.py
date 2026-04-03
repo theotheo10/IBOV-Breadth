@@ -88,8 +88,12 @@ def fetch_prices(tickers: list[str], start: str, end: str, chunk_size: int = 8) 
                 if raw.empty:
                     break
 
+                # yfinance 1.x always returns MultiIndex (field, ticker)
                 if isinstance(raw.columns, pd.MultiIndex):
                     close = raw["Close"]
+                    # Single ticker returns Series — convert to DataFrame
+                    if isinstance(close, pd.Series):
+                        close = close.to_frame(name=chunk[0])
                 else:
                     close = raw[["Close"]].rename(columns={"Close": chunk[0]})
 
