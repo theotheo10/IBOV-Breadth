@@ -528,7 +528,7 @@ footer {
       <div class="chart-canvas"><canvas id="ibovChart"></canvas></div>
       <div class="measure-tip" id="ibovMeasure"></div>
     </div>
-    <div class="chart-hint">scroll para zoom · shift+drag para medir</div>
+    <div class="chart-hint">scroll para zoom · clique+drag para medir</div>
     <div class="ibov-note">cor = composite de sentimento · verde escuro = muito deprimido · vermelho = sobrecomprado</div>
   </div>
 
@@ -552,7 +552,7 @@ footer {
       <div class="chart-canvas"><canvas id="sentChart"></canvas></div>
       <div class="measure-tip" id="sentMeasure"></div>
     </div>
-    <div class="chart-hint">scroll para zoom · shift+drag para medir</div>
+    <div class="chart-hint">scroll para zoom · clique+drag para medir</div>
   </div>
 
   <!-- TÉCNICO -->
@@ -593,7 +593,7 @@ footer {
         <div class="breadth-canvas"><canvas id="breadthChart"></canvas></div>
         <div class="measure-tip" id="breadthMeasure"></div>
       </div>
-      <div class="chart-hint">scroll para zoom · shift+drag para medir</div>
+      <div class="chart-hint">scroll para zoom · clique+drag para medir</div>
       <div class="method-note">
         O composite pondera as três médias por poder preditivo sobre retornos futuros:
         <strong>MA200 × 50%</strong> · <strong>MA50 × 35%</strong> · <strong>MA20 × 15%</strong>.
@@ -997,18 +997,24 @@ function resetZoom(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-//  MEDIÇÃO SHIFT+DRAG
+//  MEDIÇÃO CLIQUE+DRAG
+//  - Clique+drag ativa a medição (sem Shift)
+//  - Tooltip de data some enquanto arrasta
+//  - Resultado fica na tela após soltar; clique simples faz sumir
+//  - Sem ++ no sinal (diff já carrega o sinal negativo)
 // ══════════════════════════════════════════════════════════════════════
 function setupMeasure(canvasId, tipId, chartKey, getYLabel) {
   const canvas = document.getElementById(canvasId);
   const tip    = document.getElementById(tipId);
   if (!canvas || !tip) return;
 
-  let measuring = false;
-  let startX = 0, startY = 0;
+  let measuring  = false;
+  let dragged    = false;   // true se o mouse se moveu após mousedown
+  let tipVisible = false;   // resultado fixo na tela
+  let startX = 0;
   let startVal = null, startDate = null;
 
-  // overlay canvas para desenhar o retângulo
+  // Overlay para o retângulo
   const overlay = document.createElement('canvas');
   overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
   canvas.parentNode.style.position = 'relative';
@@ -1025,97 +1031,127 @@ function setupMeasure(canvasId, tipId, chartKey, getYLabel) {
     const chart = chartRegistry[chartKey];
     if (!chart) return null;
     const xScale = chart.scales.x;
-    const yScale = chart.scales.y;
-    if (!xScale || !yScale) return null;
+    if (!xScale) return null;
     const idx = Math.round(xScale.getValueForPixel(px));
     const ds  = chart.data.datasets[0];
     if (!ds || idx < 0 || idx >= ds.data.length) return null;
-    return { val: ds.data[idx], label: chart.data.labels[idx], idx };
+    return { val: ds.data[idx], label: chart.data.labels[idx] };
   }
 
+  function fmtDiff(diff, pct) {
+    // Evitar ++ ou --: diff já tem sinal, getYLabel recebe valor absoluto
+    const sign = diff >= 0 ? '+' : '−';
+    return sign + getYLabel(Math.abs(diff), Math.abs(pct));
+  }
+
+  function hideChartTooltip() {
+    // Força o Chart.js a esconder o tooltip nativo
+    const chart = chartRegistry[chartKey];
+    if (!chart) return;
+    chart.tooltip.setActiveElements([], {x:0,y:0});
+    chart.update('none');
+  }
+
+  function showChartTooltip() {
+    const chart = chartRegistry[chartKey];
+    if (!chart) return;
+    chart.update('none');
+  }
+
+  function clearOverlay() {
+    overlay.getContext('2d').clearRect(0, 0, overlay.width, overlay.height);
+  }
+
+  // ── mousedown: iniciar medição ──────────────────────────────────────
   canvas.addEventListener('mousedown', e => {
-    if (!e.shiftKey) return;
-    e.preventDefault();
+    // Clique simples (sem drag): esconder resultado fixo se visível
+    if (tipVisible) {
+      tipVisible = false;
+      tip.style.display = 'none';
+      clearOverlay();
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
     const d = getDataAtX(startX);
     if (!d || d.val == null) return;
     startVal  = d.val;
     startDate = d.label;
     measuring = true;
+    dragged   = false;
   });
 
+  // ── mousemove: atualizar retângulo e tooltip ────────────────────────
   window.addEventListener('mousemove', e => {
     if (!measuring) return;
-    const rect   = canvas.getBoundingClientRect();
-    const curX   = e.clientX - rect.left;
-    const curY   = e.clientY - rect.top;
-    const d      = getDataAtX(curX);
+    dragged = true;
+
+    // Esconder tooltip nativo do Chart.js enquanto mede
+    hideChartTooltip();
+
+    const rect = canvas.getBoundingClientRect();
+    const curX = e.clientX - rect.left;
+    const curY = e.clientY - rect.top;
+    const d    = getDataAtX(curX);
 
     // Desenhar retângulo
     const ctx2 = overlay.getContext('2d');
     ctx2.clearRect(0, 0, overlay.width, overlay.height);
-    ctx2.fillStyle = 'rgba(124,106,247,.08)';
-    ctx2.strokeStyle = 'rgba(124,106,247,.4)';
-    ctx2.lineWidth = 1;
+    ctx2.fillStyle   = 'rgba(124,106,247,.08)';
+    ctx2.strokeStyle = 'rgba(124,106,247,.35)';
+    ctx2.lineWidth   = 1;
     const x1 = Math.min(startX, curX);
     const x2 = Math.max(startX, curX);
     ctx2.fillRect(x1, 0, x2-x1, overlay.height);
     ctx2.strokeRect(x1, 0, x2-x1, overlay.height);
 
     if (!d || d.val == null) return;
-    const endVal  = d.val;
-    const endDate = d.label;
-    const diff    = endVal - startVal;
-    const pct     = startVal !== 0 ? (diff / Math.abs(startVal)) * 100 : 0;
-    const cls     = diff >= 0 ? 'mt-pos' : 'mt-neg';
-    const sign    = diff >= 0 ? '+' : '';
+    const diff = d.val - startVal;
+    const pct  = startVal !== 0 ? (diff / Math.abs(startVal)) * 100 : 0;
+    const cls  = diff >= 0 ? 'mt-pos' : 'mt-neg';
 
     tip.innerHTML = `
-      <div class="mt-date">${startDate} → ${endDate}</div>
-      <div class="mt-val ${cls}">${sign}${getYLabel(diff, pct)}</div>
+      <div class="mt-date">${startDate} → ${d.label}</div>
+      <div class="mt-val ${cls}">${fmtDiff(diff, pct)}</div>
     `;
-    // Posicionar tooltip
-    const tipW = 200;
-    let tx = curX + 12;
-    if (tx + tipW > canvas.offsetWidth) tx = curX - tipW - 12;
-    tip.style.left = tx + 'px';
-    tip.style.top  = Math.max(0, curY - 40) + 'px';
+
+    // Posicionar: segue o cursor
+    const tipW = tip.offsetWidth || 220;
+    let tx = curX + 14;
+    if (tx + tipW > canvas.offsetWidth) tx = curX - tipW - 14;
+    tip.style.left    = tx + 'px';
+    tip.style.top     = Math.max(4, curY - 48) + 'px';
     tip.style.display = 'block';
   });
 
+  // ── mouseup: fixar resultado na tela ───────────────────────────────
   window.addEventListener('mouseup', e => {
     if (!measuring) return;
     measuring = false;
-    const ctx2 = overlay.getContext('2d');
-    ctx2.clearRect(0, 0, overlay.width, overlay.height);
-    setTimeout(() => { tip.style.display = 'none'; }, 2000);
-  });
-
-  // Cancelar se soltar shift
-  window.addEventListener('keyup', e => {
-    if (e.key === 'Shift' && measuring) {
-      measuring = false;
-      const ctx2 = overlay.getContext('2d');
-      ctx2.clearRect(0, 0, overlay.width, overlay.height);
+    if (dragged) {
+      // Manter retângulo e tooltip fixos; restaurar tooltip nativo
+      tipVisible = true;
+      showChartTooltip();
+    } else {
+      // Clique sem drag: limpar
+      clearOverlay();
       tip.style.display = 'none';
     }
   });
 }
 
 function initMeasureAll() {
-  // IBOV: valor em pontos
+  // IBOV: valor em pontos — getYLabel recebe valor absoluto
   setupMeasure('ibovChart', 'ibovMeasure', 'ibov',
-    (diff, pct) => `${diff >= 0 ? '+' : ''}${diff.toFixed(0)} pts  (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+    (abs, absPct) => `${abs.toFixed(0)} pts  (${absPct.toFixed(1)}%)`
   );
-  // Composite: valor em %
+  // Composite: p.p.
   setupMeasure('sentChart', 'sentMeasure', 'sent',
-    (diff, pct) => `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} p.p.  (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+    (abs, absPct) => `${abs.toFixed(1)} p.p.  (${absPct.toFixed(1)}%)`
   );
-  // Breadth técnico: valor em %
+  // Breadth técnico: p.p.
   setupMeasure('breadthChart', 'breadthMeasure', 'breadth',
-    (diff, pct) => `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} p.p.  (${diff >= 0 ? '+' : ''}${pct.toFixed(1)}%)`
+    (abs, absPct) => `${abs.toFixed(1)} p.p.  (${absPct.toFixed(1)}%)`
   );
 }
 
