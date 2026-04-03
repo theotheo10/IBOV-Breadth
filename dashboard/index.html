@@ -754,17 +754,17 @@ function renderSent(data) {
             },
           },
         },
+        zoom:{
+          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
+            onZoom:({chart})=>showZoomReset(chart)},
+          pan:{enabled:true,mode:'x',modifierKey:'shift',
+            onPan:({chart})=>showZoomReset(chart)},
+        },
       },
       scales:{
         x:{ grid:{color:'rgba(28,28,42,.8)'}, ticks:{color:'#64647e', font:{family:"'DM Mono'",size:10}, maxTicksLimit:10, maxRotation:0} },
         y:{ min:0, max:100, grid:{color:'rgba(28,28,42,.8)'}, ticks:{color:'#64647e', font:{family:"'DM Mono'",size:10}, callback:v=>v+'%'} },
       },
-      plugins:{zoom:{
-          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
-            onZoom:({chart})=>showZoomReset(chart)},
-          pan:{enabled:true,mode:'x',modifierKey:'shift',
-            onPan:({chart})=>showZoomReset(chart)},
-        }},
     },
     plugins:[{
       id:'zones',
@@ -817,17 +817,17 @@ function renderBreadth(data) {
             title: items => items[0]?.label ?? '',
             label: c => `${c.dataset.label}  ${c.parsed.y?.toFixed(1)}%`,
           }},
+        zoom:{
+          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
+            onZoom:({chart})=>showZoomReset(chart)},
+          pan:{enabled:true,mode:'x',modifierKey:'shift',
+            onPan:({chart})=>showZoomReset(chart)},
+        },
       },
       scales:{
         x:{grid:{color:'rgba(28,28,42,.8)'},ticks:{color:'#64647e',font:{family:"'DM Mono'",size:10},maxTicksLimit:10,maxRotation:0}},
         y:{min:0,max:100,grid:{color:'rgba(28,28,42,.8)'},ticks:{color:'#64647e',font:{family:"'DM Mono'",size:10},callback:v=>v+'%'}},
       },
-      plugins:{zoom:{
-          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
-            onZoom:({chart})=>showZoomReset(chart)},
-          pan:{enabled:true,mode:'x',modifierKey:'shift',
-            onPan:({chart})=>showZoomReset(chart)},
-        }},
     },
     plugins:[{
       id:'thresholds',
@@ -943,6 +943,12 @@ function renderIbovChart(data) {
             },
           },
         },
+        zoom:{
+          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
+            onZoom:({chart})=>showZoomReset(chart)},
+          pan:{enabled:true,mode:'x',modifierKey:'shift',
+            onPan:({chart})=>showZoomReset(chart)},
+        },
       },
       scales: {
         x: {
@@ -961,12 +967,6 @@ function renderIbovChart(data) {
           },
         },
       },
-      plugins:{zoom:{
-          zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x',
-            onZoom:({chart})=>showZoomReset(chart)},
-          pan:{enabled:true,mode:'x',modifierKey:'shift',
-            onPan:({chart})=>showZoomReset(chart)},
-        }},
     },
   });
   chartRegistry['ibov'] = ibovChartObj;
